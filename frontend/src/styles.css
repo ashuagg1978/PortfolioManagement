@@ -1,0 +1,731 @@
+:root {
+  color-scheme: light;
+  font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+  background:
+    radial-gradient(circle at top left, rgba(31, 111, 235, 0.14), transparent 28%),
+    linear-gradient(160deg, #f4efe4 0%, #fffdf8 52%, #eef6ff 100%);
+  color: #112031;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+p,
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  width: min(1200px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+/* --- top nav --- */
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding-bottom: 20px;
+}
+
+.top-nav__brand h1 {
+  font-size: 1.6rem;
+  letter-spacing: -0.03em;
+  margin-top: 4px;
+}
+
+.top-nav__links {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.top-nav__links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  text-decoration: none;
+  color: #415163;
+  font-weight: 600;
+  font-size: 0.92rem;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.top-nav__links a:hover {
+  background: rgba(31, 111, 235, 0.08);
+}
+
+.top-nav__links a.active {
+  background: #112031;
+  color: #fff;
+}
+
+.nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.page {
+  display: grid;
+  gap: 22px;
+}
+
+/* --- panels --- */
+
+.hero-panel,
+.panel {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(17, 32, 49, 0.08);
+  box-shadow: 0 24px 80px rgba(17, 32, 49, 0.08);
+}
+
+.hero-panel {
+  border-radius: 28px;
+  padding: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.hero-panel h2 {
+  margin-top: 10px;
+  font-size: clamp(1.6rem, 3vw, 2.4rem);
+  letter-spacing: -0.03em;
+}
+
+.hero-copy {
+  margin-top: 16px;
+  max-width: 620px;
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: #415163;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #1f6feb;
+}
+
+.panel {
+  border-radius: 24px;
+  padding: 24px;
+}
+
+.panel--wide {
+  overflow: hidden;
+}
+
+.panel__heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.panel__heading h3 {
+  margin-top: 6px;
+  font-size: 1.25rem;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 0.95fr 1.45fr;
+  gap: 20px;
+}
+
+/* --- KPI cards --- */
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.summary-grid--compact {
+  margin-top: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.kpi-card {
+  padding: 20px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(244, 247, 250, 0.75));
+  border-top: 4px solid var(--accent, #1f6feb);
+}
+
+.kpi-card__title {
+  color: #556476;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.kpi-card__value {
+  margin: 8px 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+}
+
+.kpi-card__value--positive {
+  color: #15803d;
+}
+
+.kpi-card__value--negative {
+  color: #dc2626;
+}
+
+.kpi-card__caption {
+  color: #617286;
+  font-size: 0.88rem;
+}
+
+/* --- allocation --- */
+
+.allocation-list {
+  display: grid;
+  gap: 16px;
+}
+
+.allocation-row {
+  display: grid;
+  grid-template-columns: 1.4fr 2fr auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.allocation-row__label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.allocation-row__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.allocation-row__track {
+  width: 100%;
+  height: 10px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e8eef4;
+}
+
+.allocation-row__fill {
+  height: 100%;
+  border-radius: inherit;
+}
+
+.allocation-row__pct {
+  font-variant-numeric: tabular-nums;
+  color: #617286;
+  font-size: 0.88rem;
+  text-align: right;
+}
+
+/* --- data tables --- */
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.data-table th,
+.data-table td {
+  padding: 10px 12px;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(17, 32, 49, 0.08);
+}
+
+.data-table th {
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #617286;
+}
+
+.data-table th.sortable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.data-table tbody tr:hover {
+  background: rgba(31, 111, 235, 0.04);
+}
+
+.row--deleted {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.positive {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.negative {
+  color: #dc2626;
+  font-weight: 700;
+}
+
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.status-pill--in-profit {
+  background: rgba(21, 128, 61, 0.12);
+  color: #15803d;
+}
+
+.status-pill--in-loss {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.status-pill--redeemed {
+  background: rgba(97, 114, 134, 0.14);
+  color: #556476;
+}
+
+.status-pill--flat {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92620a;
+}
+
+/* import row action badges */
+
+.status-pill--new {
+  background: rgba(21, 128, 61, 0.12);
+  color: #15803d;
+}
+
+.status-pill--duplicate {
+  background: rgba(97, 114, 134, 0.14);
+  color: #556476;
+}
+
+.status-pill--unmapped {
+  background: rgba(245, 158, 11, 0.14);
+  color: #92620a;
+}
+
+.status-pill--error {
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+
+.empty-state {
+  color: #617286;
+  padding: 24px 0;
+  text-align: center;
+}
+
+/* --- buttons / forms --- */
+
+.btn {
+  border: none;
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 0.9rem;
+  cursor: pointer;
+  background: #eef2f6;
+  color: #112031;
+  transition: transform 0.1s ease, box-shadow 0.15s ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: #1f6feb;
+  color: #fff;
+  box-shadow: 0 12px 24px rgba(31, 111, 235, 0.25);
+}
+
+.btn--danger {
+  background: rgba(220, 38, 38, 0.1);
+  color: #dc2626;
+}
+
+.btn--small {
+  padding: 6px 14px;
+  font-size: 0.8rem;
+}
+
+/* Entry forms (Add transaction, Create SIP) - a label/control table rather
+   than an auto-fit CSS grid, so field width and alignment stay predictable
+   at any viewport width instead of drifting/overlapping as columns
+   reflow. */
+
+.form-table {
+  width: 100%;
+  max-width: 520px;
+  border-collapse: collapse;
+}
+
+.form-table td {
+  padding: 8px 0;
+  vertical-align: middle;
+}
+
+.form-table tr + tr td {
+  border-top: 1px solid rgba(17, 32, 49, 0.06);
+}
+
+.form-table__label {
+  width: 40%;
+  padding-right: 16px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #415163;
+  white-space: nowrap;
+}
+
+.form-table__relative {
+  position: relative;
+}
+
+.form-table__actions {
+  padding-top: 16px;
+}
+
+.form-table input,
+.form-table select {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: inherit;
+  font-size: 0.92rem;
+  background: #fff;
+}
+
+.form-error {
+  color: #dc2626;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.form-error--inline {
+  margin-top: 4px;
+  white-space: normal;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #415163;
+  font-weight: 600;
+}
+
+.hint {
+  color: #617286;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  margin-bottom: 14px;
+}
+
+.sync-result {
+  color: #15803d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.sync-result--error {
+  color: #dc2626;
+}
+
+/* --- scheme search --- */
+
+.scheme-search {
+  position: relative;
+}
+
+.scheme-search input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: inherit;
+  font-size: 0.92rem;
+}
+
+.scheme-search__hint {
+  margin: 4px 0 0;
+  font-size: 0.78rem;
+  color: #a2adb8;
+}
+
+.scheme-search__status {
+  padding: 8px 10px;
+  font-size: 0.85rem;
+  color: #617286;
+  cursor: default;
+  line-height: 1.5;
+}
+
+.scheme-search__status--error {
+  color: #dc2626;
+}
+
+.scheme-search__results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 32, 49, 0.1);
+  box-shadow: 0 20px 40px rgba(17, 32, 49, 0.14);
+}
+
+.scheme-search__results li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.88rem;
+}
+
+.scheme-search__results li:hover {
+  background: rgba(31, 111, 235, 0.08);
+}
+
+.scheme-search__meta {
+  color: #617286;
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+/* --- scheme code field (deliberately separate from the name search - see
+   components/SchemeCodeField.tsx for why getting this right matters) --- */
+
+.scheme-code-field__input {
+  width: 100%;
+  padding: 9px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: 'Courier New', monospace;
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+  background: #fbfaf6;
+}
+
+.scheme-code-field__status {
+  margin: 4px 0 0;
+  font-size: 0.8rem;
+  color: #617286;
+}
+
+.scheme-code-field__status--ok {
+  color: #15803d;
+  font-weight: 600;
+}
+
+.scheme-code-field__status--error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* --- commission field --- */
+
+.commission-field {
+  font-weight: 700;
+  color: #112031;
+}
+
+.commission-field--empty {
+  color: #a2adb8;
+  font-weight: 400;
+}
+
+.commission-field--invalid {
+  color: #dc2626;
+  cursor: help;
+}
+
+/* --- SIP due table --- */
+
+.due-table__input {
+  width: 100px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: inherit;
+}
+
+.due-table__actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.badge--warn {
+  background: rgba(245, 158, 11, 0.18);
+  color: #92620a;
+}
+
+/* --- import mapping --- */
+
+.mapping-block {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(17, 32, 49, 0.08);
+}
+
+.mapping-block h4 {
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.mapping-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr;
+  align-items: start;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.mapping-row__fields {
+  display: grid;
+  gap: 6px;
+}
+
+.mapping-row select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .content-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .data-table {
+    min-width: 680px;
+  }
+
+  .mapping-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .app-shell {
+    width: min(100% - 20px, 1200px);
+    padding-top: 16px;
+  }
+
+  .hero-panel,
+  .panel {
+    border-radius: 20px;
+    padding: 20px;
+  }
+}
+
+/* --- Schemes browser page --- */
+
+.schemes-search-box {
+  width: 100%;
+  max-width: 560px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(17, 32, 49, 0.14);
+  font-family: inherit;
+  font-size: 1rem;
+  background: #fff;
+  margin-bottom: 14px;
+}
+
+.schemes-table__code {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+}

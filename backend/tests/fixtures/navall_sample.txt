@@ -1,0 +1,19 @@
+Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Plan;Option;Net Asset Value;Date
+ 
+Aditya Birla Sun Life Mutual Fund
+ 
+119551;INF209KA12Z1;INF209KA13Z9;Aditya Birla Sun Life Banking & PSU Debt Fund;Direct Plan;IDCW-Re-investment;106.9996;20-Aug-2026
+119552;INF209K01YM2;-;Aditya Birla Sun Life Banking & PSU Debt Fund;Direct Plan;MONTHLY DCW Payout;117.3095;20-Aug-2026
+119553;INF209K01YO8;-;Aditya Birla Sun Life Banking & PSU Debt Fund;Direct Plan;QUARTERLY IDCW Payout;105.0298;20-Aug-2026
+ 
+Bandhan Mutual Fund
+ 
+121936;INF194K019M8;-;Bandhan Banking and PSU Fund;Direct Plan;Annual IDCW;12.3978;20-Aug-2026
+121279;INF194K015G8;-;Bandhan Banking and PSU Fund;Direct Plan;Growth;27.0850;20-Aug-2026
+121280;INF194K01SN6;-;Bandhan Banking and PSU Fund;Regular Plan;Growth;26.2277;20-Aug-2026
+119718;INF200K01UG1;-;SBI FLEXICAP FUND;;;122.2733;19-Aug-2026
+119717;INF200K01UE6;INF200K01UF3;SBI FLEXICAP FUND;;;61.1158;19-Aug-2026
+103216;INF200K01230;INF200K01248;SBI FLEXICAP FUND;;;48.5874;19-Aug-2026
+103215;INF200K01222;-;SBI FLEXICAP FUND;;;108.5079;19-Aug-2026
+999999;-;INF999K01ZZ9;Stale Test Fund;Direct Plan;Growth;10.0000;02-Jul-2018
+999998;INF999K01ZZ8;-;NA NAV Test Fund;Direct Plan;Growth;N.A.;20-Aug-2026
