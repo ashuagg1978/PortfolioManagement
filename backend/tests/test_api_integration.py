@@ -770,3 +770,34 @@ def test_sip_confirm_with_transaction_date_override(client, db_session):
         },
     )
     assert r2.json()["id"] == r.json()["id"]
+
+
+def test_account_update(client):
+    account = client.get("/api/accounts").json()[0]
+    r = client.patch(
+        f"/api/accounts/{account['id']}", json={"account_name": "Renamed Account", "platform": "New Platform"}
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["id"] == account["id"]
+    assert body["account_name"] == "Renamed Account"
+    assert body["platform"] == "New Platform"
+
+    listed = client.get("/api/accounts").json()
+    assert any(a["account_name"] == "Renamed Account" for a in listed)
+
+
+def test_account_create_and_update_reject_duplicate_names(client):
+    accounts = client.get("/api/accounts").json()
+    existing_name = accounts[0]["account_name"]
+
+    r = client.post("/api/accounts", json={"account_name": existing_name, "platform": "X"})
+    assert r.status_code == 422
+
+    r2 = client.patch(f"/api/accounts/{accounts[1]['id']}", json={"account_name": existing_name, "platform": "X"})
+    assert r2.status_code == 422
+
+
+def test_account_update_not_found(client):
+    r = client.patch("/api/accounts/999999", json={"account_name": "X", "platform": "Y"})
+    assert r.status_code == 404

@@ -88,8 +88,10 @@ off an account.
 
 **Constraint:** unique (`user_id`, `account_name`).
 
-**CRUD:** `GET /api/accounts`, `POST /api/accounts`. No update/delete route yet - accounts are
-expected to be long-lived and few (seeded: 5). `scripts/seed.py` creates the initial 5.
+**CRUD:** `GET /api/accounts`, `POST /api/accounts`, `PATCH /api/accounts/{id}` (rename or change
+platform). No delete route - accounts are expected to be long-lived and few, and every transaction/
+SIP/import batch references one by FK, so removing one isn't a simple soft-delete-and-move-on the
+way a transaction is. `scripts/seed.py` creates the initial 5.
 
 ---
 

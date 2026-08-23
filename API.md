@@ -39,7 +39,13 @@ Standard FastAPI/Pydantic shape: `{"detail": "..."}`.
 Lists the current user's accounts. → `AccountOut[]` (`id`, `account_name`, `platform`).
 
 ### `POST /api/accounts`
-Body: `{account_name, platform}`. Creates a new account. → `AccountOut`, `201`.
+Body: `{account_name, platform}`. Creates a new account. → `AccountOut`, `201`. `422` if an account
+with that name already exists (unique per user).
+
+### `PATCH /api/accounts/{id}`
+Body: `{account_name, platform}`. Renames the account and/or changes its platform label - every
+transaction/SIP/import already referencing it by id is unaffected. → `AccountOut`. `422` on a name
+collision, `404` if the account doesn't exist or isn't the current user's.
 
 ---
 

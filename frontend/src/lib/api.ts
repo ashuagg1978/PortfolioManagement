@@ -63,7 +63,13 @@ function del<T>(path: string): Promise<T> {
 }
 
 // --- accounts ---
+export interface AccountInput {
+  account_name: string;
+  platform: string;
+}
 export const listAccounts = () => get<Account[]>('/accounts');
+export const createAccount = (input: AccountInput) => post<Account>('/accounts', input);
+export const updateAccount = (id: number, input: AccountInput) => patch<Account>(`/accounts/${id}`, input);
 
 // --- NAV / schemes ---
 export const syncNav = () => post<SyncResponse>('/nav/sync');

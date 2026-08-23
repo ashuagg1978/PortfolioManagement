@@ -6,6 +6,11 @@ class AccountCreate(BaseModel):
     platform: str
 
 
+class AccountUpdate(BaseModel):
+    account_name: str
+    platform: str
+
+
 class AccountOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
