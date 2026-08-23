@@ -14,7 +14,9 @@ export type TransactionSource = 'MANUAL' | 'SIP' | 'IMPORT';
 export interface Transaction {
   id: number;
   account_id: number;
+  account_name: string;
   scheme_code: string;
+  scheme_display_name: string;
   transaction_date: string; // YYYY-MM-DD
   type: TransactionType;
   source: TransactionSource;
@@ -28,6 +30,11 @@ export interface Transaction {
   is_deleted: boolean;
 }
 
+export interface TransactionListResponse {
+  items: Transaction[];
+  total: number;
+}
+
 export interface SchemeSearchResult {
   scheme_code: string;
   scheme_name: string;
@@ -35,6 +42,11 @@ export interface SchemeSearchResult {
   option: string | null;
   latest_nav: number | null;
   nav_date: string | null;
+}
+
+export interface NavHistoryPoint {
+  nav: number;
+  nav_date: string;
 }
 
 export interface SyncResponse {
@@ -80,7 +92,9 @@ export type SipFrequency = 'MONTHLY' | 'BIWEEKLY';
 export interface Sip {
   id: number;
   account_id: number;
+  account_name: string;
   scheme_code: string;
+  scheme_display_name: string;
   amount: number;
   frequency: SipFrequency;
   start_date: string;

@@ -25,12 +25,18 @@ class SipVersion(BaseModel):
     folio_no: str | None = None
 
 
+class SipStopRequest(BaseModel):
+    end_date: date | None = None  # defaults to today server-side
+
+
 class SipOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
     account_id: int
+    account_name: str
     scheme_code: str
+    scheme_display_name: str
     amount: MoneyField
     frequency: str
     start_date: date
@@ -56,6 +62,9 @@ class DueEntryOut(BaseModel):
 class ConfirmEntryRequest(BaseModel):
     sip_id: int
     scheduled_date: date
+    # Overrides the system's trading-day-adjusted guess with the date the
+    # user's actual statement shows. Omit to keep the computed date.
+    transaction_date: date | None = None
     nav: NavField
     units: UnitsField
 
@@ -79,6 +88,7 @@ class UpcomingOccurrenceOut(BaseModel):
 __all__ = [
     "SipCreate",
     "SipVersion",
+    "SipStopRequest",
     "SipOut",
     "DueEntryOut",
     "ConfirmEntryRequest",

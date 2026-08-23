@@ -1,11 +1,14 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
 from db.session import get_db
 from models.scheme import Scheme
-from schemas.nav import SchemeSearchResult, SyncResponse
+from schemas.nav import NavHistoryOut, SchemeSearchResult, SyncResponse
 from services.amfi import sync_navs
+from services.nav_history import fetch_nav_on_or_before
 
 router = APIRouter(tags=["nav"])
 
@@ -56,3 +59,19 @@ def search_schemes(q: str, limit: int = 20, db: Session = Depends(get_db)) -> li
         )
         for r in rows
     ]
+
+
+@router.get("/schemes/{scheme_code}/nav-history", response_model=NavHistoryOut | None)
+def nav_on_date(scheme_code: str, on: date) -> NavHistoryOut | None:
+    """A convenience prefill for entering a past transaction (SIP
+    confirmation, or a backdated manual entry): the scheme's NAV on `on`,
+    or the closest trading day before it, sourced from the community
+    mfapi.in historical-NAV API rather than AMFI's own feed (which is
+    same-day only - see services/amfi.py). Returns `null` rather than 404
+    when nothing is found, so the frontend can show "enter manually"
+    without treating it as an error.
+    """
+    result = fetch_nav_on_or_before(scheme_code, on)
+    if result is None:
+        return None
+    return NavHistoryOut(nav=result.nav, nav_date=result.nav_date)

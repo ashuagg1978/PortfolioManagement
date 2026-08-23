@@ -9,15 +9,24 @@ touch the ledger.
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal
+from typing import Protocol
 
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
+from models.account import Account
 from models.enums import TransactionSource, TransactionType
+from models.portfolio_scheme import PortfolioScheme
+from models.scheme import Scheme
 from models.transaction import Transaction
+from models.user import User
 from services.charges import compute_commission, compute_signed_amount
 from services.fifo import LedgerEntry, run_fifo
+from services.scheme_names import display_name_for, full_scheme_name
 
 _AMOUNT_QUANT = Decimal("0.01")  # matches db.types.Money's 2dp
 _UNITS_QUANT = Decimal("0.000001")  # matches db.types.Units's 6dp
@@ -263,3 +272,126 @@ def restore_transaction(db: Session, txn: Transaction) -> Transaction:
     db.commit()
     db.refresh(txn)
     return txn
+
+
+@dataclass(frozen=True, slots=True)
+class TransactionFilters:
+    account_id: int | None = None
+    scheme_code: str | None = None
+    # Free-text: matches the AMFI scheme name, the user's own display name,
+    # or the scheme code itself - lets the ledger page's search box work
+    # without first resolving to an exact code via the scheme picker.
+    scheme_name: str | None = None
+    type: str | None = None
+    source: str | None = None
+    date_from: date | None = None
+    date_to: date | None = None
+    include_deleted: bool = False
+
+
+def _scheme_codes_matching_name(db: Session, user_id: int, q: str) -> list[str]:
+    like = f"%{q}%"
+    from_schemes = db.query(Scheme.scheme_code).filter(Scheme.scheme_name.ilike(like))
+    from_display_names = db.query(PortfolioScheme.scheme_code).filter(
+        PortfolioScheme.user_id == user_id, PortfolioScheme.display_name.ilike(like)
+    )
+    return [c for (c,) in from_schemes.union(from_display_names).all()]
+
+
+def _filtered_query(db: Session, user: User, filters: TransactionFilters):
+    account_ids = [a.id for a in db.query(Account.id).filter(Account.user_id == user.id).all()]
+    query = db.query(Transaction).filter(Transaction.account_id.in_(account_ids))
+
+    if not filters.include_deleted:
+        query = query.filter(Transaction.is_deleted.is_(False))
+    if filters.account_id is not None:
+        query = query.filter(Transaction.account_id == filters.account_id)
+    if filters.scheme_code is not None:
+        query = query.filter(Transaction.scheme_code == filters.scheme_code)
+    if filters.scheme_name:
+        matching_codes = _scheme_codes_matching_name(db, user.id, filters.scheme_name)
+        code_condition = Transaction.scheme_code.in_(matching_codes) if matching_codes else False
+        query = query.filter(or_(Transaction.scheme_code.ilike(f"%{filters.scheme_name}%"), code_condition))
+    if filters.type is not None:
+        query = query.filter(Transaction.type == filters.type)
+    if filters.source is not None:
+        query = query.filter(Transaction.source == filters.source)
+    if filters.date_from is not None:
+        query = query.filter(Transaction.transaction_date >= filters.date_from)
+    if filters.date_to is not None:
+        query = query.filter(Transaction.transaction_date <= filters.date_to)
+    return query
+
+
+def list_transactions(
+    db: Session,
+    user: User,
+    filters: TransactionFilters,
+    *,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[Transaction], int]:
+    """Returns (page of transactions, total matching count) - the count
+    query mirrors every filter but not limit/offset, so pagination controls
+    know how many pages exist.
+    """
+    query = _filtered_query(db, user, filters)
+    total = query.with_entities(func.count(Transaction.id)).scalar() or 0
+    rows = (
+        query.order_by(Transaction.transaction_date.desc(), Transaction.id.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
+    return rows, total
+
+
+def list_all_matching_transactions(
+    db: Session, user: User, filters: TransactionFilters
+) -> list[Transaction]:
+    """Every transaction matching the filters, unpaginated - for the Excel
+    export, which should cover the full filtered result set rather than
+    just whatever page the ledger happens to be showing. Chronological
+    ascending (oldest first), unlike the ledger's newest-first view - a
+    spreadsheet export reads more naturally as a running history.
+    """
+    return _filtered_query(db, user, filters).order_by(
+        Transaction.transaction_date.asc(), Transaction.id.asc()
+    ).all()
+
+
+class _HasAccountAndScheme(Protocol):
+    id: int
+    account_id: int
+    scheme_code: str
+
+
+def enrich_display_names(
+    db: Session, user: User, rows: Sequence[_HasAccountAndScheme]
+) -> dict[int, tuple[str, str]]:
+    """Maps row id -> (account_name, scheme_display_name), resolved per
+    unique account/scheme rather than per row (a page is at most a few
+    dozen rows, but typically holds far fewer distinct accounts/schemes).
+
+    Works for anything with (id, account_id, scheme_code) - Transaction and
+    Sip both qualify, so this is shared between the ledger and SIP list
+    rather than duplicated.
+    """
+    if not rows:
+        return {}
+    account_names = {
+        a.id: a.account_name
+        for a in db.query(Account).filter(Account.id.in_({r.account_id for r in rows})).all()
+    }
+    scheme_names = {
+        s.scheme_code: full_scheme_name(s)
+        for s in db.query(Scheme).filter(Scheme.scheme_code.in_({r.scheme_code for r in rows})).all()
+    }
+    display_names = {
+        code: display_name_for(db, user.id, code, scheme_names.get(code, code))
+        for code in {r.scheme_code for r in rows}
+    }
+    return {
+        r.id: (account_names.get(r.account_id, "—"), display_names.get(r.scheme_code, r.scheme_code))
+        for r in rows
+    }

@@ -20,7 +20,7 @@ from models.scheme import Scheme
 from models.transaction import Transaction
 from models.user import User
 from services.fifo import LedgerEntry, run_fifo
-from services.scheme_names import display_name_for
+from services.scheme_names import display_name_for, full_scheme_name
 from services.xirr import scheme_xirr
 
 
@@ -103,11 +103,17 @@ def compute_holdings(db: Session, user: User, *, as_of: date | None = None) -> l
         units_held = fifo.units_held
         current_value = (units_held * latest_nav) if latest_nav is not None else Decimal("0")
 
-        # Net Invested, matching the workbook exactly: current value minus
-        # the sum of signed cash flows for this scheme (signed_amount is
-        # negative for purchases, positive for redemptions).
-        signed_sum = sum((t.signed_amount for t in txns), Decimal("0"))
-        net_invested = current_value - signed_sum
+        # Net Invested = the FIFO cost basis of units still held (what you
+        # actually paid for what you're still holding) - NOT current value
+        # netted against cash flows. That earlier formula (current_value -
+        # signed_sum) silently added current_value on top of the real
+        # invested amount for any scheme with no redemptions, since
+        # signed_sum there is just -total_purchased: a $63,000 purchase-only
+        # holding worth $64,582 today showed "Net Invested: $127,582" -
+        # roughly double the real figure - and a diluted % Gain as a direct
+        # consequence. fifo.cost_remaining is exactly "cost of units held"
+        # and needs no such adjustment.
+        net_invested = fifo.cost_remaining
 
         unrealized_gain = current_value - fifo.cost_remaining
         realized_gain = fifo.realized_gain
@@ -129,7 +135,7 @@ def compute_holdings(db: Session, user: User, *, as_of: date | None = None) -> l
         )
 
         display_name = display_name_for(
-            db, user.id, scheme_code, scheme.scheme_name if scheme else scheme_code
+            db, user.id, scheme_code, full_scheme_name(scheme) if scheme else scheme_code
         )
 
         holdings.append(
@@ -162,7 +168,14 @@ def compute_dashboard(db: Session, user: User, *, as_of: date | None = None) -> 
 
     net_invested = sum((h.net_invested for h in holdings), Decimal("0"))
     current_value = sum((h.current_value for h in holdings), Decimal("0"))
-    net_gain_loss = current_value - net_invested
+    # Sum of each scheme's own total_gain (unrealized + realized), not
+    # current_value - net_invested - the latter would silently drop every
+    # scheme's realized gain from past redemptions, since net_invested is
+    # now cost-of-units-held only and doesn't net against redemption
+    # proceeds the way it used to (see compute_holdings for why that
+    # netting was wrong). This keeps the KPI card consistent with what the
+    # per-scheme breakdown table shows.
+    net_gain_loss = sum((h.total_gain for h in holdings), Decimal("0"))
     total_return_pct = (net_gain_loss / net_invested * 100) if net_invested != 0 else None
     active_schemes = sum(1 for h in holdings if h.net_units > 0)
 

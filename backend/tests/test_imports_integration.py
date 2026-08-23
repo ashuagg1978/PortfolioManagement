@@ -55,7 +55,7 @@ def test_single_sheet_upload_resolves_via_scheme_code_and_commits(client, db_ses
     assert r.status_code == 200
     assert r.json()["committed"] == 1
 
-    txns = client.get("/api/transactions").json()
+    txns = client.get("/api/transactions").json()["items"]
     assert len(txns) == 1
     assert txns[0]["scheme_code"] == "103196"
     assert txns[0]["source"] == "IMPORT"
@@ -118,9 +118,9 @@ def test_soft_deleted_transaction_is_restored_not_blocked_on_reimport(client, db
     batch_id = _upload(client, content, account_id).json()["id"]
     client.post(f"/api/imports/{batch_id}/commit")
 
-    txn = client.get("/api/transactions").json()[0]
+    txn = client.get("/api/transactions").json()["items"][0]
     client.delete(f"/api/transactions/{txn['id']}")
-    assert client.get("/api/transactions").json() == []
+    assert client.get("/api/transactions").json()["items"] == []
 
     # Re-upload the exact same statement - should NOT be flagged a duplicate.
     batch2 = _upload(client, content, account_id).json()
@@ -129,7 +129,7 @@ def test_soft_deleted_transaction_is_restored_not_blocked_on_reimport(client, db
     result = client.post(f"/api/imports/{batch2['id']}/commit").json()
     assert result["restored"] == 1
     assert result["committed"] == 0
-    assert len(client.get("/api/transactions").json()) == 1
+    assert client.get("/api/transactions").json()["total"] == 1
 
 
 def test_true_duplicate_is_skipped_not_recommitted(client, db_session):
@@ -148,7 +148,7 @@ def test_true_duplicate_is_skipped_not_recommitted(client, db_session):
     result = client.post(f"/api/imports/{batch2['id']}/commit").json()
     assert result["duplicates"] == 1
     assert result["committed"] == 0
-    assert len(client.get("/api/transactions").json()) == 1
+    assert client.get("/api/transactions").json()["total"] == 1
 
 
 @pytest.mark.skipif(not WORKBOOK.exists(), reason="legacy workbook not present")

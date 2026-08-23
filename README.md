@@ -145,11 +145,9 @@ npm run build                   # production build (also typechecks)
 
 ## Reconciliation against the workbook
 
-The workbook's own `MFwise` sheet was used as the source of truth to validate this app's numbers:
-`backend/scripts/reconcile.py`-style checks were run manually (import the workbook through
-`/api/imports`, compare Net Invested/Current Value/XIRR per scheme). Two genuine data issues
-surfaced in the workbook itself during that process - not bugs in this app - and are worth fixing
-at the source before they're relied on:
+The workbook was imported end to end through `/api/imports` and the import mechanics were checked
+directly: row counts, scheme resolution, duplicate detection, and account assignment. That surfaced
+two genuine data issues in the workbook itself - not bugs in this app:
 - One purchase row (Txn-Maniqm-Ashu) has NAV x units off from the recorded amount by about ₹36,
   beyond ordinary rounding noise.
 - One purchase row (Txn-Maniqm-Hars, 2021) has no NAV recorded at all for a ₹500,000 transaction.
@@ -158,6 +156,15 @@ at the source before they're relied on:
 Everything else - 619 of 632 rows (98%) - imports and commits cleanly. The remaining unmapped rows
 are schemes from AMCs that were acquired/merged (L&T → HSBC in 2022, Principal → Sundaram in 2021)
 and need a human decision about which successor scheme to map them to.
+
+**What that pass did *not* catch**: the imported row counts and totals looked right, but the actual
+Net Invested *arithmetic* wasn't checked cell-by-cell against the workbook's own `MFwise` column -
+and it turned out to be wrong (`current_value − Σ signed_amount`, which silently added
+`current_value` on top of the real invested amount for any scheme with no redemptions - see
+`services/portfolio.py::compute_holdings`). It was found from real usage, not this reconciliation
+pass, and is now fixed and covered by tests (`tests/test_api_integration.py`). Worth a real,
+row-by-row comparison against the workbook's `MFwise` sheet before trusting any other derived
+figure at face value - none has had that rigor applied yet.
 
 ## Local-first, deploy later
 

@@ -41,7 +41,9 @@ class TransactionOut(BaseModel):
 
     id: int
     account_id: int
+    account_name: str
     scheme_code: str
+    scheme_display_name: str
     transaction_date: date
     type: str
     source: str
@@ -53,3 +55,8 @@ class TransactionOut(BaseModel):
     signed_amount: MoneyField
     folio_no: str | None
     is_deleted: bool
+
+
+class TransactionListOut(BaseModel):
+    items: list[TransactionOut]
+    total: int

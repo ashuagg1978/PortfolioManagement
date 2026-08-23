@@ -69,14 +69,46 @@ scheme code. Returns `[]` for queries under 2 characters (not a 422 - the fronte
 every keystroke). → `SchemeSearchResult[]` (`scheme_code`, `scheme_name`, `plan`, `option`,
 `latest_nav`, `nav_date`).
 
+### `GET /api/schemes/{scheme_code}/nav-history?on=YYYY-MM-DD`
+A convenience prefill for entering a **past** transaction (SIP confirmation, or a backdated manual
+entry) - the AMFI feed (`POST /api/nav/sync`) only ever has *today's* NAV, so it has nothing to
+offer for a historical date. Sourced from the community [mfapi.in](https://api.mfapi.in) historical-
+NAV API instead - **not authoritative**, purely a starting point the user reviews and can overwrite
+before confirming; nothing from this endpoint is ever written to the ledger on its own.
+
+Returns the scheme's NAV on `on`, or the closest trading day before it (within a 10-day lookback,
+to ride out a holiday cluster without silently reaching into an unrelated month) -
+`{"nav": 122.7014, "nav_date": "2024-06-14"}`. → `null` (not a 404) when nothing is found - an
+unknown scheme code, a network failure, or no data in range are all treated as "couldn't prefill
+this", not an error, so the frontend just falls back to asking the user to enter it manually.
+
+`services/nav_history.py` fetches the scheme's **entire** history and matches the date in Python -
+mfapi.in's own documented `startDate`/`endDate` query params were verified live and do **not**
+actually filter the response.
+
 ---
 
 ## Transactions
 
 ### `GET /api/transactions`
-Query params: `account_id`, `scheme_code`, `type` (`PURCHASE`/`REDEMPTION`), `date_from`,
-`date_to`, `include_deleted` (default `false`), `limit` (default 200), `offset`. → `TransactionOut[]`,
-newest first.
+The ledger page's search/filter/pagination endpoint. Query params:
+
+| Param | Meaning |
+|---|---|
+| `account_id` | Exact match |
+| `scheme_code` | Exact match |
+| `scheme_name` | Free text - matches the AMFI scheme name, the user's own display name (`portfolio_schemes`), **or** the scheme code itself, so one search box covers "type a fund name" and "paste a code" alike |
+| `type` | `PURCHASE` \| `REDEMPTION` |
+| `source` | `MANUAL` \| `SIP` \| `IMPORT` |
+| `date_from`, `date_to` | Inclusive range |
+| `include_deleted` | Default `false` |
+| `limit`, `offset` | Default `limit=50` |
+
+→ `TransactionListOut`: `{items: TransactionOut[], total: int}`, newest first. `total` is the count
+matching every filter *except* `limit`/`offset`, for building pagination controls. Every
+`TransactionOut` here (and from every other transaction-returning route below) is enriched with
+`account_name` and `scheme_display_name` - resolved per unique account/scheme in the page, not per
+row, so this stays cheap even at the page size limit.
 
 ### `POST /api/transactions`
 Body:
@@ -89,8 +121,19 @@ Body:
 ```
 Derives `commission` and `signed_amount` server-side (see
 [DATABASE.md#commission](DATABASE.md#commission)); on `REDEMPTION`, validates that enough units
-are actually held in that account/scheme/folio as of the transaction date before allowing it.
-→ `TransactionOut`, `201`. `422` on invalid commission or over-redemption.
+are actually held in that account/scheme/folio as of the transaction date before allowing it. If a
+transaction with these exact details was previously soft-deleted, it's **restored** instead of
+rejected as a duplicate (see [DATABASE.md](DATABASE.md#transactions)).
+→ `TransactionOut`, `201`. `422` on invalid commission, over-redemption, or a genuine (active,
+non-deleted) duplicate.
+
+### `GET /api/transactions/export`
+The same filters as `GET /api/transactions` above (everything except `limit`/`offset` - export
+always covers the full filtered result set, not just whatever page the ledger happens to be
+showing), returned as a `.xlsx` download instead of JSON. Columns: `Date | Account | Scheme |
+Scheme Code | Type | Source | NAV | Units | Amount | Commission | Folio`, chronological ascending
+(oldest first) - the opposite of the ledger's newest-first view, since a spreadsheet export reads
+more naturally as a running history. → `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`.
 
 ### `PATCH /api/transactions/{id}`
 Body: `{transaction_date, nav, units, amount, folio_no}`. Re-derives commission and re-validates
@@ -121,14 +164,21 @@ ledger on every call (nothing here is cached or pre-aggregated - see
 
 ```json
 {
-  "net_invested": 5050.09, "current_value": 2829.34, "net_gain_loss": -2220.75,
-  "total_return_pct": -43.97, "active_schemes": 1, "total_commission_paid": 20.0,
-  "portfolio_xirr": 0.0595, "nav_as_of": "2026-08-20",
+  "net_invested": 63000.0, "current_value": 64582.48, "net_gain_loss": 1582.48,
+  "total_return_pct": 2.51, "active_schemes": 1, "total_commission_paid": 20.0,
+  "portfolio_xirr": 0.0435, "nav_as_of": "2026-08-20",
   "holdings": [ /* SchemeHoldingOut[] */ ]
 }
 ```
-- `net_invested` matches the workbook's own convention: `current_value − Σ signed_amount` for that
-  scope, not a running cash-in total.
+- `net_invested` is the **FIFO cost basis of units still held** (`SchemeHoldingOut.net_invested`
+  summed across schemes) - what you actually paid for what you're still holding, independent of
+  today's market value. An earlier version computed this as `current_value − Σ signed_amount`,
+  which for any scheme with no redemptions silently added `current_value` on top of the real
+  invested amount (a $63,000 purchase-only holding worth $64,582 today showed "Net Invested:
+  $127,582" - see `services/portfolio.py::compute_holdings` for the fix and why).
+- `net_gain_loss` is the sum of every scheme's own `total_gain` (unrealized + realized) - kept
+  consistent with what the per-scheme breakdown table shows, including realized gains from past
+  redemptions.
 - `nav_as_of` is `max(nav_date)` over **currently held** schemes only, not the global feed date -
   a fully-redeemed scheme's stale NAV date shouldn't move this banner.
 - `portfolio_xirr` concatenates every scheme's cash flows plus **one** synthetic
@@ -153,7 +203,8 @@ Just the `holdings` array from above, as its own endpoint. Each `SchemeHoldingOu
 ## SIPs
 
 See [DATABASE.md#sip-execution-model](DATABASE.md#sip-execution-model) for the design; this is the
-HTTP surface over it.
+HTTP surface over it. Every `SipOut` below is enriched with `account_name` and `scheme_display_name`,
+the same way `TransactionOut` is (see [Transactions](#transactions) above).
 
 ### `GET /api/sips?active_only=true`
 → `SipOut[]`.
@@ -166,7 +217,25 @@ Body: `{account_id, scheme_code, amount, frequency, start_date, end_date?, folio
 The "close and clone" edit flow. Body: `{effective_date, amount?, frequency?, folio_no?}` - only
 the fields being changed need to be supplied; omitted fields carry over from the current SIP. Closes
 the existing row (`end_date = effective_date - 1 day`, `is_active = false`) and creates a new one
-starting `effective_date`, linked via `parent_sip_id`. → `SipOut` (the new row).
+starting `effective_date`, linked via `parent_sip_id`. → `SipOut` (the new row). Works regardless of
+whether the SIP being edited is currently active, held, or stopped - the new row is always active,
+so this doubles as "resume with different terms."
+
+### `POST /api/sips/{id}/hold`
+Pauses a SIP (`is_active = false`, `end_date` untouched) - no new due entries or upcoming
+projections while held, since both already filter on `is_active`. The mandate's own terms are not
+touched, so `POST /api/sips/{id}/resume` brings it back exactly as it was. → `SipOut`.
+
+### `POST /api/sips/{id}/resume`
+Reactivates a held or stopped SIP - **always clears `end_date`**, so resuming something that was
+stopped doesn't reactivate it into a state with no future occurrences at all (`start_date >
+end_date` produces an empty schedule, which would look identical to still being paused). → `SipOut`.
+
+### `POST /api/sips/{id}/stop`
+Body: `{end_date?}` - defaults to today. Permanently ends a SIP as of that date
+(`is_active = false`, `end_date` set) - a direct mutation, not a close-and-clone, since there's no
+successor row: the mandate's own `start_date`/`end_date` is the historical record of when it ran.
+`422` if `end_date` is before the SIP's `start_date`. → `SipOut`.
 
 ### `GET /api/sips/due`
 **The core read of the SIP Entries Due page.** For every active SIP, projects occurrences from
@@ -190,11 +259,14 @@ have a matching transaction or `sip_skips` row.
 `{"count": 17}` - powers the nav-bar badge. Polled every 60s by the frontend.
 
 ### `POST /api/sips/due/confirm`
-Body: `{sip_id, scheduled_date, nav, units}`. `amount` is **not** supplied - it's locked from the
-SIP mandate. Recomputes the adjusted trading date, derives commission the same way any purchase
-does, and writes a `transactions` row with `source = SIP`. **Idempotent**: confirming the same
-`(sip_id, scheduled_date)` twice returns the existing transaction rather than erroring or
-duplicating. → `TransactionOut`.
+Body: `{sip_id, scheduled_date, transaction_date?, nav, units}`. `amount` is **not** supplied - it's
+locked from the SIP mandate. By default uses the trading-day-adjusted date the system computed
+(same as `due`'s `adjusted_date`); pass `transaction_date` to override it with whatever the user's
+actual statement shows instead - `scheduled_date` (the idempotency key) is untouched either way, so
+overriding the date can never create a duplicate or break re-confirm idempotency. Derives commission
+the same way any purchase does, and writes a `transactions` row with `source = SIP`. **Idempotent**:
+confirming the same `(sip_id, scheduled_date)` twice returns the existing transaction rather than
+erroring or duplicating. → `TransactionOut`.
 
 ### `POST /api/sips/due/skip`
 Body: `{sip_id, scheduled_date, reason?}`. Records the occurrence as never-executed so it stops

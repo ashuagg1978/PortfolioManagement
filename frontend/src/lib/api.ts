@@ -10,11 +10,14 @@ import type {
   DueEntry,
   ImportBatch,
   ImportRow,
+  NavHistoryPoint,
   SchemeHolding,
   SchemeSearchResult,
   Sip,
   SyncResponse,
   Transaction,
+  TransactionListResponse,
+  TransactionSource,
   TransactionType,
   UpcomingOccurrence,
 } from '../types/api';
@@ -68,23 +71,43 @@ export const searchSchemes = (q: string, limit = 20) =>
   q.trim().length < 2
     ? Promise.resolve([])
     : get<SchemeSearchResult[]>(`/schemes/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+/** NAV on (or the closest trading day before) the given date, sourced from
+ * mfapi.in's historical data - a prefill convenience, not authoritative.
+ * Returns null (not an error) when nothing is found. */
+export const getNavOnDate = (schemeCode: string, on: string) =>
+  get<NavHistoryPoint | null>(`/schemes/${schemeCode}/nav-history?on=${on}`);
 
 // --- transactions ---
 export interface TransactionFilters {
   account_id?: number;
   scheme_code?: string;
+  scheme_name?: string;
   type?: TransactionType;
+  source?: TransactionSource;
   date_from?: string;
   date_to?: string;
   include_deleted?: boolean;
+  limit?: number;
+  offset?: number;
+}
+function buildQuery(filters: object): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters as Record<string, unknown>)) {
+    if (value !== undefined && value !== null && value !== '') params.set(key, String(value));
+  }
+  return params.toString();
 }
 export const listTransactions = (filters: TransactionFilters = {}) => {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(filters)) {
-    if (value !== undefined && value !== null) params.set(key, String(value));
-  }
-  const qs = params.toString();
-  return get<Transaction[]>(`/transactions${qs ? `?${qs}` : ''}`);
+  const qs = buildQuery(filters);
+  return get<TransactionListResponse>(`/transactions${qs ? `?${qs}` : ''}`);
+};
+/** A plain download URL (not a fetch call) - the caller renders this as an
+ * <a href> so the browser handles the file save, same pattern as the
+ * import template download. Excludes limit/offset - export always covers
+ * the full filtered set, not just the current page. */
+export const transactionsExportUrl = (filters: Omit<TransactionFilters, 'limit' | 'offset'> = {}) => {
+  const qs = buildQuery(filters);
+  return `/api/transactions/export${qs ? `?${qs}` : ''}`;
 };
 export interface TransactionInput {
   account_id: number;
@@ -130,10 +153,18 @@ export const versionSip = (
   id: number,
   input: { effective_date: string; amount?: number; frequency?: string; folio_no?: string | null },
 ) => post<Sip>(`/sips/${id}/version`, input);
+export const holdSip = (id: number) => post<Sip>(`/sips/${id}/hold`);
+export const resumeSip = (id: number) => post<Sip>(`/sips/${id}/resume`);
+export const stopSip = (id: number, end_date?: string) => post<Sip>(`/sips/${id}/stop`, { end_date });
 export const getDueEntries = () => get<DueEntry[]>('/sips/due');
 export const getDueCount = () => get<{ count: number }>('/sips/due/count');
-export const confirmDueEntry = (input: { sip_id: number; scheduled_date: string; nav: number; units: number }) =>
-  post<Transaction>('/sips/due/confirm', input);
+export const confirmDueEntry = (input: {
+  sip_id: number;
+  scheduled_date: string;
+  transaction_date?: string; // overrides the system-computed trading-day-adjusted date
+  nav: number;
+  units: number;
+}) => post<Transaction>('/sips/due/confirm', input);
 export const skipDueEntry = (input: { sip_id: number; scheduled_date: string; reason?: string }) =>
   post<{ id: number }>('/sips/due/skip', input);
 export const getUpcoming = (n = 5) => get<UpcomingOccurrence[]>(`/sips/upcoming?n=${n}`);

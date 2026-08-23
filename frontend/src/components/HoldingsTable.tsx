@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   createColumnHelper,
   flexRender,
@@ -59,6 +60,7 @@ const columns = [
 ];
 
 export default function HoldingsTable({ holdings }: { holdings: SchemeHolding[] }) {
+  const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'current_value', desc: true }]);
   const data = useMemo(() => holdings, [holdings]);
 
@@ -92,7 +94,12 @@ export default function HoldingsTable({ holdings }: { holdings: SchemeHolding[] 
         </thead>
         <tbody>
           {table.getRowModel().rows.map((row) => (
-            <tr key={row.id}>
+            <tr
+              key={row.id}
+              className="row--clickable"
+              title={`View all transactions for ${row.original.display_name}, across every account`}
+              onClick={() => navigate(`/transactions?scheme_name=${encodeURIComponent(row.original.scheme_code)}`)}
+            >
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
               ))}

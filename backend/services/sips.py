@@ -25,7 +25,7 @@ from models.sip_skip import SipSkip
 from models.transaction import Transaction
 from models.user import User
 from services.charges import InvalidCommissionError
-from services.scheme_names import display_name_for
+from services.scheme_names import display_name_for, full_scheme_name
 from services.sip_schedule import generate_schedule
 from services.trading_calendar import load_holidays, next_trading_day
 from services.transactions import DuplicateTransactionError, OverRedemptionError, create_transaction
@@ -76,11 +76,18 @@ def _get_owned_sip(db: Session, user: User, sip_id: int) -> Sip:
 
 
 def _confirmed_keys(db: Session, sip_ids: list[int]) -> set[tuple[int, date]]:
+    """Occurrences that already have an ACTIVE transaction - a soft-deleted
+    one doesn't count, so deleting a confirmed SIP entry correctly brings it
+    back onto the due list rather than leaving it permanently confirmed.
+    Re-confirming it goes through create_transaction's own restore-not-
+    duplicate handling (services/transactions.py), so this composes
+    correctly rather than fighting that logic.
+    """
     if not sip_ids:
         return set()
     rows = (
         db.query(Transaction.sip_id, Transaction.sip_scheduled_date)
-        .filter(Transaction.sip_id.in_(sip_ids))
+        .filter(Transaction.sip_id.in_(sip_ids), Transaction.is_deleted.is_(False))
         .all()
     )
     return {(sip_id, d) for sip_id, d in rows}
@@ -137,7 +144,7 @@ def due_entries(db: Session, user: User, *, as_of: date | None = None) -> list[D
                     account_name=accounts[sip.account_id].account_name,
                     scheme_code=sip.scheme_code,
                     display_name=display_name_for(
-                        db, user.id, sip.scheme_code, scheme.scheme_name if scheme else sip.scheme_code
+                        db, user.id, sip.scheme_code, full_scheme_name(scheme) if scheme else sip.scheme_code
                     ),
                     scheduled_date=occ.scheduled_date,
                     adjusted_date=occ.adjusted_date,
@@ -163,22 +170,29 @@ def confirm_entry(
     scheduled_date: date,
     nav: Decimal,
     units: Decimal,
+    transaction_date: date | None = None,
 ) -> Transaction:
     """Amount is taken from the SIP mandate (not user-entered - the mandate
     debits a fixed sum); commission falls out of create_transaction's shared
     derivation. The unique (sip_id, sip_scheduled_date) index makes a
     double-submit return the already-confirmed row instead of erroring.
+
+    transaction_date lets the user override the system's trading-day-
+    adjusted guess with whatever date their actual statement shows -
+    scheduled_date (the idempotency key) is untouched either way, so
+    editing the date can never create a duplicate or break re-confirm
+    idempotency.
     """
     sip = _get_owned_sip(db, user, sip_id)
     holidays = load_holidays(db)
-    adjusted_date = next_trading_day(scheduled_date, holidays)
+    resolved_date = transaction_date or next_trading_day(scheduled_date, holidays)
 
     try:
         return create_transaction(
             db,
             account_id=sip.account_id,
             scheme_code=sip.scheme_code,
-            transaction_date=adjusted_date,
+            transaction_date=resolved_date,
             type=TransactionType.PURCHASE,
             nav=nav,
             units=units,
@@ -229,6 +243,53 @@ def skip_entry(
         raise
     db.refresh(skip)
     return skip
+
+
+def hold_sip(db: Session, user: User, *, sip_id: int) -> Sip:
+    """Pauses a SIP without ending it - no new due entries or upcoming
+    projections while held (both already filter on is_active), but the
+    mandate's own terms (amount, frequency, start_date) are untouched, so
+    resuming picks up exactly where it left off. Distinct from stop: a
+    held SIP records no end_date, since it isn't over - just paused.
+    """
+    sip = _get_owned_sip(db, user, sip_id)
+    sip.is_active = False
+    db.commit()
+    db.refresh(sip)
+    return sip
+
+
+def resume_sip(db: Session, user: User, *, sip_id: int) -> Sip:
+    """Reactivates a held or stopped SIP. Always clears end_date - resuming
+    a SIP that was stopped as of some past date but leaving that end_date
+    in place would reactivate it into a state that generates no due
+    entries at all (generate_schedule has nothing to produce once
+    start_date > end_date), which would look identical to still being
+    paused. A fresh resume is perpetual again unless re-stopped or edited.
+    """
+    sip = _get_owned_sip(db, user, sip_id)
+    sip.is_active = True
+    sip.end_date = None
+    db.commit()
+    db.refresh(sip)
+    return sip
+
+
+def stop_sip(db: Session, user: User, *, sip_id: int, end_date: date | None = None) -> Sip:
+    """Permanently ends a SIP as of end_date (default: today) - the mandate
+    itself is the historical record of when it ran, so this is a direct
+    mutation rather than a close-and-clone: there's no successor row to
+    create, unlike editing terms (see close_and_clone).
+    """
+    sip = _get_owned_sip(db, user, sip_id)
+    resolved_end = end_date or date.today()
+    if resolved_end < sip.start_date:
+        raise ValueError(f"End date {resolved_end} is before this SIP's start date {sip.start_date}.")
+    sip.end_date = resolved_end
+    sip.is_active = False
+    db.commit()
+    db.refresh(sip)
+    return sip
 
 
 def close_and_clone(
@@ -302,7 +363,7 @@ def project_upcoming(db: Session, user: User, *, n: int = 5) -> list[UpcomingOcc
                     account_name=accounts[sip.account_id].account_name,
                     scheme_code=sip.scheme_code,
                     display_name=display_name_for(
-                        db, user.id, sip.scheme_code, scheme.scheme_name if scheme else sip.scheme_code
+                        db, user.id, sip.scheme_code, full_scheme_name(scheme) if scheme else sip.scheme_code
                     ),
                     scheduled_date=occ.scheduled_date,
                     adjusted_date=occ.adjusted_date,

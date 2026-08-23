@@ -20,3 +20,8 @@ class SchemeSearchResult(BaseModel):
     option: str | None
     latest_nav: NavField | None
     nav_date: date | None
+
+
+class NavHistoryOut(BaseModel):
+    nav: NavField
+    nav_date: date
