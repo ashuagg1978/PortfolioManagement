@@ -9,6 +9,7 @@ from models.market_holiday import MarketHoliday
 from models.portfolio_scheme import PortfolioScheme
 from models.scheme import Scheme
 from models.scheme_alias import SchemeAlias
+from models.scheme_nav_history import SchemeNavHistory
 from models.sip import Sip
 from models.sip_skip import SipSkip
 from models.transaction import Transaction
@@ -22,6 +23,7 @@ __all__ = [
     "PortfolioScheme",
     "Scheme",
     "SchemeAlias",
+    "SchemeNavHistory",
     "Sip",
     "SipSkip",
     "Transaction",

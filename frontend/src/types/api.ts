@@ -55,6 +55,17 @@ export interface SyncResponse {
   rows_skipped: number;
   feed_date: string | null;
   duration_ms: number;
+  history_schemes_synced: number;
+  history_schemes_failed: number;
+  history_points_inserted: number;
+  history_duration_ms: number;
+}
+
+export interface PortfolioHistoryPoint {
+  as_of: string; // YYYY-MM-DD
+  current_value: number;
+  net_invested: number;
+  pct_gain: number | null;
 }
 
 export interface SchemeHolding {
@@ -75,6 +86,17 @@ export interface SchemeHolding {
   xirr: number | null;
 }
 
+export interface AccountHoldings {
+  account_id: number;
+  account_name: string;
+  net_invested: number;
+  current_value: number;
+  net_gain_loss: number;
+  pct_gain: number | null;
+  xirr: number | null;
+  schemes: SchemeHolding[];
+}
+
 export interface DashboardSummary {
   net_invested: number;
   current_value: number;
@@ -85,6 +107,7 @@ export interface DashboardSummary {
   portfolio_xirr: number | null;
   nav_as_of: string | null;
   holdings: SchemeHolding[];
+  by_account: AccountHoldings[];
 }
 
 export type SipFrequency = 'MONTHLY' | 'BIWEEKLY';

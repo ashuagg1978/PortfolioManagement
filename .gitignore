@@ -10,9 +10,9 @@ backend/.pytest_cache/
 backend/.mypy_cache/
 
 # Database (SQLite file + WAL sidecars - the app's entire persisted state)
-*.db
-*.db-wal
-*.db-shm
+# *.db
+# *.db-wal
+# *.db-shm
 
 # Env files (.env.example is intentionally NOT ignored)
 .env

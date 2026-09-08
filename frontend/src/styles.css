@@ -302,6 +302,10 @@ h4 {
   gap: 20px;
 }
 
+.content-grid--single {
+  grid-template-columns: 1fr;
+}
+
 /* --- KPI cards --- */
 
 .summary-grid {
@@ -434,6 +438,128 @@ h4 {
 
 .data-table tbody tr:hover {
   background: rgba(31, 111, 235, 0.04);
+}
+
+/* --- account-wise breakdown --- */
+
+.account-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.account-group {
+  border: 1px solid rgba(17, 32, 49, 0.08);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.account-group__header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 16px;
+  background: rgba(31, 111, 235, 0.04);
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+.account-group__header:hover {
+  background: rgba(31, 111, 235, 0.08);
+}
+
+.account-group__chevron {
+  color: #1f6feb;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.account-group__name {
+  font-weight: 700;
+  flex: 1 1 auto;
+  min-width: 120px;
+}
+
+.account-group__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.account-group__stat-label {
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 0.72rem;
+  color: #a2adb8;
+}
+
+.account-group__view-all {
+  color: #1f6feb;
+  font-weight: 600;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.account-group__view-all:hover {
+  text-decoration: underline;
+}
+
+.data-table--nested {
+  font-size: 0.86rem;
+}
+
+/* --- portfolio value chart --- */
+
+.portfolio-chart {
+  position: relative;
+  user-select: none; /* dragging to zoom shouldn't select page text */
+}
+
+.portfolio-chart__reset {
+  position: absolute;
+  top: 0;
+  right: 0;
+  z-index: 2;
+}
+
+.portfolio-chart__hint {
+  margin: 6px 2px 0;
+  color: #a2adb8;
+  font-size: 0.78rem;
+}
+
+.portfolio-chart__tooltip {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(17, 32, 49, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(17, 32, 49, 0.12);
+  padding: 10px 14px;
+}
+
+.portfolio-chart__tooltip-date {
+  color: #617286;
+  font-size: 0.78rem;
+  margin-bottom: 2px;
+}
+
+.portfolio-chart__tooltip-pct {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.portfolio-chart__tooltip-line {
+  color: #415163;
+  font-size: 0.82rem;
 }
 
 .row--deleted {
@@ -870,6 +996,15 @@ h4 {
 
   .mapping-row {
     grid-template-columns: 1fr;
+  }
+
+  .account-group__header {
+    flex-wrap: wrap;
+    gap: 10px 20px;
+  }
+
+  .account-group__stat {
+    align-items: flex-start;
   }
 }
 

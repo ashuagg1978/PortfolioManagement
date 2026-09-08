@@ -99,6 +99,88 @@ def test_net_invested_is_cost_of_units_held_not_inflated_by_current_value(client
     assert abs(holding["pct_gain"] - expected_pct) < 0.01
 
 
+def test_dashboard_by_account_aggregates_at_account_level(client, db_session):
+    """Two accounts, two schemes, one of the schemes held in both accounts.
+    by_account must show one group per account whose schemes list is scoped
+    to that account only, and whose totals (net invested, current value)
+    equal the sum of that account's own scheme rows - not the portfolio-wide
+    per-scheme figures repeated under both accounts.
+    """
+    _seed_scheme(db_session, code="103196", name="Nippon India ELSS Tax Saver Fund", nav="150.00")
+    _seed_scheme(db_session, code="120503", name="Kotak Contra Fund", nav="80.00")
+    accounts = client.get("/api/accounts").json()
+    acc_a, acc_b = accounts[0]["id"], accounts[1]["id"]
+
+    # Account A: 100 units of scheme 103196 @ NAV 100 = 10,000
+    client.post(
+        "/api/transactions",
+        json={
+            "account_id": acc_a,
+            "scheme_code": "103196",
+            "transaction_date": "2024-01-10",
+            "type": "PURCHASE",
+            "nav": 100,
+            "units": 100,
+            "amount": 10000,
+        },
+    )
+    # Account B: 50 units of scheme 103196 @ NAV 100 = 5,000
+    client.post(
+        "/api/transactions",
+        json={
+            "account_id": acc_b,
+            "scheme_code": "103196",
+            "transaction_date": "2024-01-10",
+            "type": "PURCHASE",
+            "nav": 100,
+            "units": 50,
+            "amount": 5000,
+        },
+    )
+    # Account B: 20 units of scheme 120503 @ NAV 50 = 1,000
+    client.post(
+        "/api/transactions",
+        json={
+            "account_id": acc_b,
+            "scheme_code": "120503",
+            "transaction_date": "2024-01-10",
+            "type": "PURCHASE",
+            "nav": 50,
+            "units": 20,
+            "amount": 1000,
+        },
+    )
+
+    dash = client.get("/api/dashboard").json()
+    by_account = {a["account_id"]: a for a in dash["by_account"]}
+
+    assert acc_a in by_account and acc_b in by_account
+    assert len(by_account) == 2  # accounts with no activity are omitted
+
+    a_group = by_account[acc_a]
+    assert len(a_group["schemes"]) == 1
+    assert a_group["schemes"][0]["scheme_code"] == "103196"
+    assert a_group["schemes"][0]["net_units"] == 100
+    assert a_group["net_invested"] == 10000
+
+    b_group = by_account[acc_b]
+    assert {s["scheme_code"] for s in b_group["schemes"]} == {"103196", "120503"}
+    assert b_group["net_invested"] == 6000  # 5000 + 1000
+
+    # Each account's total is exactly the sum of its own scheme rows, not
+    # the portfolio-wide per-scheme total repeated under every account
+    # holding it.
+    assert a_group["net_invested"] + b_group["net_invested"] == dash["net_invested"]
+    assert a_group["current_value"] + b_group["current_value"] == dash["current_value"]
+
+    # 103196's portfolio-wide net_invested (10000+5000) must not leak into
+    # account A's group - it should only see its own 10000 contribution.
+    portfolio_holding = next(h for h in dash["holdings"] if h["scheme_code"] == "103196")
+    assert portfolio_holding["net_invested"] == 15000
+    a_scheme_holding = a_group["schemes"][0]
+    assert a_scheme_holding["net_invested"] == 10000
+
+
 def test_net_invested_excludes_cost_of_already_redeemed_units(client, db_session):
     """After a partial redemption, Net Invested (cost of units still held)
     must drop by the FIFO cost of the units sold - not just net against the
@@ -801,3 +883,80 @@ def test_account_create_and_update_reject_duplicate_names(client):
 def test_account_update_not_found(client):
     r = client.patch("/api/accounts/999999", json={"account_name": "X", "platform": "Y"})
     assert r.status_code == 404
+
+
+def test_nav_sync_endpoint_includes_history_result_fields(client, monkeypatch):
+    # Patched where used: api.routes.nav imports both sync_navs and
+    # sync_nav_history by name into its own module namespace.
+    import api.routes.nav as nav_route
+    from services.amfi import SyncResult
+    from services.portfolio_history import HistorySyncResult
+
+    monkeypatch.setattr(
+        nav_route,
+        "sync_navs",
+        lambda db: SyncResult(rows_parsed=5, rows_upserted=5, rows_skipped=0, feed_date=date(2024, 6, 14), duration_ms=10),
+    )
+    monkeypatch.setattr(
+        nav_route,
+        "sync_nav_history",
+        lambda db, user: HistorySyncResult(schemes_synced=2, schemes_failed=1, points_inserted=400, duration_ms=250),
+    )
+    r = client.post("/api/nav/sync")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["rows_upserted"] == 5
+    assert body["history_schemes_synced"] == 2
+    assert body["history_schemes_failed"] == 1
+    assert body["history_points_inserted"] == 400
+    assert body["history_duration_ms"] == 250
+
+
+def test_dashboard_history_empty_before_any_transactions(client):
+    r = client.get("/api/dashboard/history")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+def test_dashboard_history_endpoint_reflects_transactions_and_synced_nav(client, db_session):
+    from models.scheme_nav_history import SchemeNavHistory
+
+    _seed_scheme(db_session, code="103196", nav="150.0000")
+    account_id = client.get("/api/accounts").json()[0]["id"]
+
+    r = client.post(
+        "/api/transactions",
+        json={
+            "account_id": account_id,
+            "scheme_code": "103196",
+            "transaction_date": "2024-01-10",
+            "type": "PURCHASE",
+            "nav": 100,
+            "units": 10,
+            "amount": 1000,
+        },
+    )
+    assert r.status_code == 201
+
+    db_session.add(SchemeNavHistory(scheme_code="103196", nav_date=date(2024, 1, 10), nav="100.0000"))
+    db_session.add(SchemeNavHistory(scheme_code="103196", nav_date=date(2024, 1, 12), nav="120.0000"))
+    db_session.commit()
+
+    r = client.get("/api/dashboard/history")
+    assert r.status_code == 200
+    series = r.json()
+    by_date = {p["as_of"]: p for p in series}
+
+    assert series[0]["as_of"] == "2024-01-10"
+    assert by_date["2024-01-10"]["current_value"] == 1000.0  # 10 units * NAV 100
+    assert by_date["2024-01-10"]["net_invested"] == 1000.0  # cost basis - what was actually paid
+    assert by_date["2024-01-10"]["pct_gain"] == 0.0  # bought at cost, NAV unchanged on day 1
+
+    assert by_date["2024-01-11"]["current_value"] == 1000.0  # forward-filled (no NAV published that day)
+
+    assert by_date["2024-01-12"]["current_value"] == 1200.0  # 10 units * NAV 120
+    assert by_date["2024-01-12"]["net_invested"] == 1000.0  # cost basis unchanged - no new purchase
+    assert by_date["2024-01-12"]["pct_gain"] == 20.0  # (1200 - 1000) / 1000 * 100
+
+    # series runs all the way to today
+    assert series[-1]["as_of"] == date.today().isoformat()

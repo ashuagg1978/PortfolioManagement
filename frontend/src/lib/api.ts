@@ -11,6 +11,7 @@ import type {
   ImportBatch,
   ImportRow,
   NavHistoryPoint,
+  PortfolioHistoryPoint,
   SchemeHolding,
   SchemeSearchResult,
   Sip,
@@ -142,6 +143,7 @@ export const previewCommission = (input: {
 // --- dashboard ---
 export const getDashboard = () => get<DashboardSummary>('/dashboard');
 export const getHoldings = () => get<SchemeHolding[]>('/dashboard/holdings');
+export const getPortfolioHistory = () => get<PortfolioHistoryPoint[]>('/dashboard/history');
 
 // --- SIPs ---
 export interface SipInput {

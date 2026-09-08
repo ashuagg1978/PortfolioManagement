@@ -11,7 +11,7 @@ from datetime import date
 from decimal import Decimal
 from unittest.mock import Mock, patch
 
-from services.nav_history import fetch_nav_on_or_before
+from services.nav_history import fetch_full_history, fetch_nav_on_or_before
 
 _SAMPLE_PAYLOAD = {
     "meta": {"scheme_code": 103196, "scheme_name": "Test Fund"},
@@ -72,3 +72,28 @@ def test_network_failure_returns_none_rather_than_raising():
     with patch("services.nav_history.httpx.get", side_effect=httpx.ConnectError("boom")):
         result = fetch_nav_on_or_before("103196", date(2024, 6, 14))
     assert result is None
+
+
+def test_fetch_full_history_returns_all_valid_points():
+    with patch("services.nav_history.httpx.get", return_value=_mock_response(_SAMPLE_PAYLOAD)):
+        points = fetch_full_history("103196")
+    # 6 entries in the fixture, 2 malformed (bad date, bad nav) - excluded.
+    assert len(points) == 4
+    assert {p.nav_date for p in points} == {
+        date(2026, 8, 21),
+        date(2026, 8, 20),
+        date(2024, 6, 14),
+        date(2024, 6, 13),
+    }
+
+
+def test_fetch_full_history_unknown_scheme_returns_empty_list():
+    with patch("services.nav_history.httpx.get", return_value=_mock_response({"meta": {}, "data": []})):
+        assert fetch_full_history("999999999") == []
+
+
+def test_fetch_full_history_network_failure_returns_empty_list_not_raise():
+    import httpx
+
+    with patch("services.nav_history.httpx.get", side_effect=httpx.ConnectError("boom")):
+        assert fetch_full_history("103196") == []

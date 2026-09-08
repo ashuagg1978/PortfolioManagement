@@ -11,6 +11,12 @@ class SyncResponse(BaseModel):
     rows_skipped: int
     feed_date: date | None
     duration_ms: int
+    # The held-scheme daily NAV history top-up, run in the same click - see
+    # services/portfolio_history.py::sync_nav_history().
+    history_schemes_synced: int
+    history_schemes_failed: int
+    history_points_inserted: int
+    history_duration_ms: int
 
 
 class SchemeSearchResult(BaseModel):

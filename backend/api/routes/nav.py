@@ -4,27 +4,43 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from api.deps import get_current_user
 from db.session import get_db
 from models.scheme import Scheme
+from models.user import User
 from schemas.nav import NavHistoryOut, SchemeSearchResult, SyncResponse
 from services.amfi import sync_navs
 from services.nav_history import fetch_nav_on_or_before
+from services.portfolio_history import sync_nav_history
 
 router = APIRouter(tags=["nav"])
 
 
 @router.post("/nav/sync", response_model=SyncResponse)
-def sync_nav(db: Session = Depends(get_db)) -> SyncResponse:
+def sync_nav(db: Session = Depends(get_db), user: User = Depends(get_current_user)) -> SyncResponse:
     """The 'Sync NAV' button - the only way NAVs ever refresh. No cron, no
     background job; this is a plain on-demand POST.
+
+    Does two things in one click: refreshes every scheme's *current* NAV
+    from the official AMFI feed (sync_navs), then tops up *historical* daily
+    NAVs for the schemes the user actually holds (sync_nav_history), feeding
+    the dashboard's value-over-time chart. Sequential in one request rather
+    than a separate call/background job - simpler, and total latency stays
+    bounded since the history step only fetches the (small) set of held
+    schemes, in parallel.
     """
     result = sync_navs(db)
+    history_result = sync_nav_history(db, user)
     return SyncResponse(
         rows_parsed=result.rows_parsed,
         rows_upserted=result.rows_upserted,
         rows_skipped=result.rows_skipped,
         feed_date=result.feed_date,
         duration_ms=result.duration_ms,
+        history_schemes_synced=history_result.schemes_synced,
+        history_schemes_failed=history_result.schemes_failed,
+        history_points_inserted=history_result.points_inserted,
+        history_duration_ms=history_result.duration_ms,
     )
 
 

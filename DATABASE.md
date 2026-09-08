@@ -127,6 +127,42 @@ has reached them - see `services/imports.py::_ensure_scheme_placeholder`. Read v
 
 ---
 
+### `scheme_nav_history`
+
+Daily NAV history, one row per scheme per day the NAV was synced - unlike `schemes.latest_nav`
+above (current value only, overwritten on every sync), this is an append-only log feeding the
+dashboard's value-over-time chart (`GET /api/dashboard/history`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | PK, integer | Surrogate PK (not a composite key) so `insert_ignore`'s conflict target is a plain unique index, matching `transactions`' own style |
+| `scheme_code` | FK → `schemes.scheme_code`, indexed | |
+| `nav_date` | date | |
+| `nav` | `Nav` | |
+
+Unique index on `(scheme_code, nav_date)`. Rows are immutable once inserted - historical NAVs
+don't get revised - so there's no `updated_at`.
+
+**Why this table exists at all** (unlike everything else on this page, which is computed live -
+see [Derived, never stored](#derived-never-stored) below): its source, the community
+[mfapi.in](https://api.mfapi.in) API, has no server-side date filtering (verified live), so
+fetching a scheme's history is always a full-history download. Doing that on every dashboard page
+load would mean N slow third-party round-trips per visit; storing it once, refreshed only on
+explicit "Sync NAV", is what keeps the dashboard fast.
+
+**Scoped to held schemes only** - not the ~14,288-scheme AMFI universe `schemes` mirrors, just the
+~15-30 schemes a real portfolio actually transacts (`services/portfolio_history.py::sync_nav_history`
+finds these via `DISTINCT scheme_code` over the user's non-deleted transactions). This bounds the
+table's size to `schemes_held × trading_days_since_first_txn` - tens of thousands of rows at most
+for a portfolio several years old, a few MB on disk - trivial next to the 14,288-row AMFI feed this
+app already fully upserts on every single current-NAV sync.
+
+**CRUD:** no direct route - populated by `POST /api/nav/sync` via `insert_ignore` (`ON CONFLICT
+(scheme_code, nav_date) DO NOTHING`), so re-syncing is a no-op for dates already stored. Read
+indirectly through `GET /api/dashboard/history`, never returned raw.
+
+---
+
 ### `portfolio_schemes`
 
 A user's own display label for a scheme they hold, e.g. scheme_code `103196` →
@@ -376,6 +412,12 @@ recomputed from the `transactions` table on every dashboard/holdings request
 (`services/fifo.py`, `services/xirr.py`, `services/portfolio.py`). Storing them would
 go stale the instant an earlier transaction is edited or soft-deleted; recomputing costs
 microseconds at this data volume.
+
+Same rule for the dashboard's day-wise portfolio-value series
+(`services/portfolio_history.py::compute_portfolio_value_history`, backing
+`GET /api/dashboard/history`): only its raw *input* - daily NAV history - is persisted (see
+`scheme_nav_history` above); the aggregated series itself is swept fresh from that table plus
+`transactions` on every request, never cached, for the same staleness reason.
 
 ### SIP execution model
 

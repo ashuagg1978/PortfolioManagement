@@ -53,8 +53,15 @@ collision, `404` if the account doesn't exist or isn't the current user's.
 
 ### `POST /api/nav/sync`
 **The "Sync NAV" button - the only way NAVs ever refresh.** No cron, no background job; a plain
-on-demand POST that fetches the full AMFI `NAVAll.txt` feed (~1.5MB, ~14,000 schemes), parses it,
-and bulk-upserts every row into `schemes`.
+on-demand POST that does two things in one click:
+1. Fetches the full AMFI `NAVAll.txt` feed (~1.5MB, ~14,000 schemes), parses it, and bulk-upserts
+   every row's **current** NAV into `schemes`.
+2. Tops up **daily historical** NAVs into `scheme_nav_history` (see
+   [DATABASE.md](DATABASE.md#scheme_nav_history)) for every scheme the user has ever transacted
+   (not the whole AMFI universe) - fetched concurrently, one full-history request per held scheme
+   against [mfapi.in](https://api.mfapi.in), since that source has no server-side date filtering
+   (see `GET /api/schemes/{scheme_code}/nav-history` below). Already-known dates are skipped, not
+   re-written, so re-running this is cheap and safe.
 
 Response:
 ```json
@@ -63,11 +70,20 @@ Response:
   "rows_upserted": 14288,
   "rows_skipped": 3,
   "feed_date": "2026-08-20",
-  "duration_ms": 3874
+  "duration_ms": 3874,
+  "history_schemes_synced": 18,
+  "history_schemes_failed": 1,
+  "history_points_inserted": 2431,
+  "history_duration_ms": 4120
 }
 ```
 `rows_skipped` counts rows the parser couldn't use (a handful of dead/stale schemes carry `N.A.`
-instead of a NAV) - not an error, just excluded from the upsert.
+instead of a NAV) - not an error, just excluded from the upsert. `history_schemes_failed` counts
+held schemes mfapi.in had no data for at all (network failure, unknown/unlisted scheme) - those
+schemes simply contribute `0` to `GET /api/dashboard/history` for their holding period, silently
+(see that endpoint below). `history_points_inserted` counts rows *attempted*, not rows that
+actually landed past the dedupe check - a rough sizing number for a "synced" toast, not something
+anything else depends on for correctness.
 
 ### `GET /api/schemes/search?q=&limit=20`
 Typeahead used by every scheme picker in the UI - searches scheme name (case-insensitive) and
@@ -203,6 +219,46 @@ Just the `holdings` array from above, as its own endpoint. Each `SchemeHoldingOu
 | `current_value`, `unrealized_gain`, `realized_gain`, `total_gain`, `pct_gain` | |
 | `status` | `"In Profit"` \| `"In Loss"` \| `"Flat"` \| `"Redeemed"` (units held = 0) |
 | `xirr` | Scheme-level, `null` if unsolvable |
+
+### `GET /api/dashboard/by-account`
+The same holdings math, sliced by account instead of merged across all of them - one entry per
+account that has any activity (accounts with no transactions are omitted, not returned as a zero
+row), each carrying its own `net_invested`/`current_value`/`net_gain_loss`/`pct_gain`/`xirr`
+**recomputed independently from that account's own transactions**, plus a nested `schemes` array
+(`SchemeHoldingOut[]`, scoped to that account only - not a copy of the portfolio-wide per-scheme
+figures). Every account's totals sum exactly to the portfolio-wide numbers from `GET /api/dashboard`.
+Also embedded as `by_account` on the main `GET /api/dashboard` response.
+
+### `GET /api/dashboard/history`
+Day-wise portfolio value/invested/gain-% from the user's first transaction to today, for the
+dashboard's performance-over-time chart:
+```json
+[
+  {"as_of": "2024-01-10", "current_value": 1000.0, "net_invested": 1000.0, "pct_gain": 0.0},
+  {"as_of": "2024-01-11", "current_value": 1000.0, "net_invested": 1000.0, "pct_gain": 0.0},
+  {"as_of": "2024-01-12", "current_value": 1200.0, "net_invested": 1000.0, "pct_gain": 20.0}
+]
+```
+Computed fresh on every call (`services/portfolio_history.py::compute_portfolio_value_history`) -
+never cached - from the transaction ledger plus the `scheme_nav_history` table (see
+[DATABASE.md](DATABASE.md#scheme_nav_history)). One point per calendar day; a day with no new NAV
+published for a scheme (weekend, holiday, or simply not synced yet) forward-fills that scheme's
+last known NAV rather than showing a gap or a dip to zero. A scheme with no NAV history at all
+contributes `0` current value for its entire holding period (`net_invested` still counts it,
+though, since that's from the ledger, not the NAV feed) - `scheme_nav_history` is populated
+separately by `POST /api/nav/sync` (below), so before the first sync (or for a scheme mfapi.in has
+no data for) this can genuinely understate `current_value`/`pct_gain`; nothing on this endpoint or
+the chart flags that, by design (see `history_schemes_failed` on the sync response instead).
+
+`net_invested` is the **FIFO cost basis of units held as of that day** - the same definition
+`GET /api/dashboard`'s `net_invested` uses for *today* (see
+[DATABASE.md](DATABASE.md#derived-never-stored)), just recomputed at every historical point. A
+redemption reduces it by the consumed lot's cost, not by netting cash flows - so `pct_gain`
+reflects true point-in-time performance rather than "today's holdings valued at yesterday's cost".
+`pct_gain` is `null` (not `0`) when `net_invested` is `0` - nothing held yet, or fully exited with
+no cost basis left - matching how `total_return_pct` is `null` in the same situation elsewhere.
+
+`[]` (not an error) when the user has no transactions yet.
 
 ---
 

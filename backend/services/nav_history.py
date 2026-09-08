@@ -70,3 +70,25 @@ def fetch_nav_on_or_before(scheme_code: str, target_date: date) -> NavHistoryPoi
     if not candidates:
         return None
     return max(candidates, key=lambda p: p.nav_date)
+
+
+def fetch_full_history(scheme_code: str) -> list[NavHistoryPoint]:
+    """The scheme's entire published NAV history - used to seed/top-up
+    services/portfolio_history.py's scheme_nav_history table, not just a
+    single date. Order is whatever mfapi.in returns (newest-first in
+    practice); the caller sorts if it cares.
+
+    Returns an empty list on any failure (network, unknown scheme, malformed
+    payload) rather than raising - same "tolerate and move on" contract as
+    fetch_nav_on_or_before, and important here specifically because this
+    runs inside a thread pool (one call per held scheme) where one scheme's
+    failure must not abort the whole sync.
+    """
+    try:
+        resp = httpx.get(f"{_BASE_URL}/{scheme_code}", timeout=20.0)
+        resp.raise_for_status()
+        payload = resp.json()
+    except (httpx.HTTPError, ValueError):
+        return []
+
+    return [p for e in payload.get("data", []) if (p := _parse_entry(e)) is not None]
