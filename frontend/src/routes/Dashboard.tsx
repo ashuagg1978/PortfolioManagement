@@ -98,7 +98,7 @@ export default function Dashboard() {
           <div className="panel__heading">
             <div>
               <p className="eyebrow">Performance over time</p>
-              <h3>Net Gain/Loss %</h3>
+              <h3>Portfolio performance</h3>
             </div>
           </div>
           {history.isLoading ? (
