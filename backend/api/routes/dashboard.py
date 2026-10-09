@@ -56,6 +56,7 @@ def dashboard(db: Session = Depends(get_db), user: User = Depends(get_current_us
         net_invested=summary.net_invested,
         current_value=summary.current_value,
         net_gain_loss=summary.net_gain_loss,
+        total_realized_gain=summary.total_realized_gain,
         total_return_pct=float(summary.total_return_pct) if summary.total_return_pct is not None else None,
         active_schemes=summary.active_schemes,
         total_commission_paid=summary.total_commission_paid,

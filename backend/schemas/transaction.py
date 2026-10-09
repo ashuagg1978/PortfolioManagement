@@ -14,6 +14,7 @@ class TransactionCreate(BaseModel):
     units: UnitsField
     amount: MoneyField
     folio_no: str | None = None
+    allow_duplicate: bool = False
 
 
 class TransactionUpdate(BaseModel):

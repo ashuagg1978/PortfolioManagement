@@ -65,6 +65,7 @@ export default function Dashboard() {
       {sync.error && <p className="sync-result sync-result--error">Sync failed: {String(sync.error)}</p>}
 
       <section className="summary-grid">
+        <KpiCard title="Current Value" value={formatCurrency(data.current_value)} accent="#0ea5e9" />
         <KpiCard title="Net Invested" value={formatCurrency(data.net_invested)} accent="#1f6feb" />
         <KpiCard
           title="Net Gain/Loss %"
@@ -78,13 +79,20 @@ export default function Dashboard() {
           tone={data.net_gain_loss >= 0 ? 'positive' : 'negative'}
           accent={data.net_gain_loss >= 0 ? '#15803d' : '#dc2626'}
         />
-        <KpiCard title="Active Schemes" value={String(data.active_schemes)} accent="#a855f7" />
+        <KpiCard
+          title="Realized Gain"
+          value={formatCurrency(data.total_realized_gain)}
+          caption="From redeemed units"
+          tone={data.total_realized_gain >= 0 ? 'positive' : 'negative'}
+          accent={data.total_realized_gain >= 0 ? '#15803d' : '#dc2626'}
+        />
         <KpiCard
           title="Portfolio XIRR"
           value={formatXirr(data.portfolio_xirr)}
           tone={(data.portfolio_xirr ?? 0) >= 0 ? 'positive' : 'negative'}
           accent="#f59e0b"
         />
+        <KpiCard title="Active Schemes" value={String(data.active_schemes)} accent="#a855f7" />
         <KpiCard
           title="Commission Paid"
           value={formatCurrency(data.total_commission_paid)}

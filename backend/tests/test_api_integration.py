@@ -221,10 +221,9 @@ def test_net_invested_excludes_cost_of_already_redeemed_units(client, db_session
     assert holding["realized_gain"] == 800.0  # 40 units * (120 - 100)
 
 
-def test_dashboard_net_gain_loss_matches_sum_of_per_scheme_total_gain(client, db_session):
-    """The KPI card's Net Gain/Loss must agree with what the per-scheme
-    breakdown table shows, including realized gains from redemptions - not
-    just unrealized gain on what's still held.
+def test_dashboard_net_gain_loss_is_unrealized_and_realized_is_separate(client, db_session):
+    """Net Gain/Loss is unrealized only; realized gain from redemptions is
+    reported separately.
     """
     _seed_scheme(db_session)
     account_id = client.get("/api/accounts").json()[0]["id"]
@@ -255,8 +254,11 @@ def test_dashboard_net_gain_loss_matches_sum_of_per_scheme_total_gain(client, db
     )
 
     dash = client.get("/api/dashboard").json()
-    expected = sum(h["total_gain"] for h in dash["holdings"])
-    assert abs(dash["net_gain_loss"] - expected) < 0.01
+    unrealized = sum(h["unrealized_gain"] for h in dash["holdings"])
+    realized = sum(h["realized_gain"] for h in dash["holdings"])
+    assert abs(dash["net_gain_loss"] - unrealized) < 0.01
+    assert abs(dash["total_realized_gain"] - realized) < 0.01
+    assert realized == 800.0
 
 
 def test_redemption_beyond_holding_is_rejected(client, db_session):

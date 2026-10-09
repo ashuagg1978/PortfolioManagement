@@ -142,7 +142,20 @@ export default function Transactions() {
       setFormError(null);
       invalidate();
     },
-    onError: (err) => setFormError(err instanceof ApiError ? err.message : 'Something went wrong.'),
+    onError: (err, input) => {
+      if (err instanceof ApiError && err.status === 409) {
+        // Duplicate: warn, and only re-submit if the user confirms it's intentional.
+        if (window.confirm(`${err.message}
+
+Add it anyway as a duplicate?`)) {
+          create.mutate({ ...input, allow_duplicate: true });
+          return;
+        }
+        setFormError('Duplicate transaction not added.');
+        return;
+      }
+      setFormError(err instanceof ApiError ? err.message : 'Something went wrong.');
+    },
   });
 
   const softDelete = useMutation({ mutationFn: softDeleteTransaction, onSuccess: invalidate });

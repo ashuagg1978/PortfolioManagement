@@ -9,6 +9,7 @@ touch the ledger.
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
@@ -95,9 +96,13 @@ def _units_held(
     query = db.query(Transaction).filter(
         Transaction.account_id == account_id,
         Transaction.scheme_code == scheme_code,
-        Transaction.folio_no == folio_no,
         Transaction.is_deleted.is_(False),
     )
+    # A blank folio (e.g. the manual-entry form's optional field) means
+    # "any folio" - imported rows carry a folio number, so matching only
+    # NULL folios would report 0 units held.
+    if folio_no:
+        query = query.filter(Transaction.folio_no == folio_no)
     if before_date is not None:
         query = query.filter(Transaction.transaction_date <= before_date)
     if exclude_transaction_id is not None:
@@ -110,6 +115,15 @@ def _units_held(
         for r in rows
     ]
     return run_fifo(entries).units_held
+
+
+def _hash_taken(db: Session, account_id: int, source_hash: str) -> bool:
+    return (
+        db.query(Transaction.id)
+        .filter(Transaction.account_id == account_id, Transaction.source_hash == source_hash)
+        .first()
+        is not None
+    )
 
 
 def create_transaction(
@@ -127,13 +141,16 @@ def create_transaction(
     sip_id: int | None = None,
     sip_scheduled_date: date | None = None,
     commission_tolerance: Decimal = Decimal("0"),
+    allow_duplicate: bool = False,
 ) -> Transaction:
     """Creates a transaction - or, if one with these exact details was
     previously soft-deleted, restores it instead of erroring. The unique
     (account_id, source_hash) index has no exemption for is_deleted rows,
     so without this check re-entering something you'd deleted (by hand, or
     via a repeat statement import) would otherwise be permanently blocked
-    by its own old row. An ACTIVE match raises DuplicateTransactionError.
+    by its own old row. An ACTIVE match raises DuplicateTransactionError,
+    unless allow_duplicate is set (the user confirmed it's intentional) -
+    then the row is stored under a unique salted hash instead.
     """
     # raises InvalidCommissionError beyond commission_tolerance (see
     # services/charges.py for why the importer passes a small nonzero
@@ -166,7 +183,10 @@ def create_transaction(
     )
     if existing is not None:
         if not existing.is_deleted:
-            raise DuplicateTransactionError(existing.id)
+            if not allow_duplicate:
+                raise DuplicateTransactionError(existing.id)
+            existing = None
+    if existing is not None:
         existing.is_deleted = False
         existing.scheme_code = scheme_code
         existing.transaction_date = transaction_date
@@ -183,6 +203,9 @@ def create_transaction(
         db.commit()
         db.refresh(existing)
         return existing
+
+    if existing is None and allow_duplicate and _hash_taken(db, account_id, source_hash):
+        source_hash = hashlib.sha256(f"{source_hash}|dup|{uuid.uuid4()}".encode("utf-8")).hexdigest()
 
     txn = Transaction(
         account_id=account_id,

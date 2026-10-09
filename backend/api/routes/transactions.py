@@ -160,13 +160,19 @@ def create(
             units=payload.units,
             amount=payload.amount,
             folio_no=payload.folio_no,
+            allow_duplicate=payload.allow_duplicate,
         )
     except InvalidCommissionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except OverRedemptionError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except DuplicateTransactionError as exc:
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # 409 (not 422) so the UI can tell "warn and let the user confirm"
+        # apart from a hard validation failure.
+        raise HTTPException(
+            status_code=409,
+            detail="A transaction with the same account, scheme, date, type, units and amount already exists.",
+        ) from exc
     return enrich_txn_out(db, user, txn)
 
 

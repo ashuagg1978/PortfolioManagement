@@ -125,6 +125,7 @@ export interface TransactionInput {
   units: number;
   amount: number;
   folio_no?: string | null;
+  allow_duplicate?: boolean;
 }
 export const createTransaction = (input: TransactionInput) => post<Transaction>('/transactions', input);
 export const updateTransaction = (

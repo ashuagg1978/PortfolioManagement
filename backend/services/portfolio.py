@@ -60,6 +60,7 @@ class DashboardSummary:
     net_invested: Decimal
     current_value: Decimal
     net_gain_loss: Decimal
+    total_realized_gain: Decimal
     total_return_pct: Decimal | None
     active_schemes: int
     total_commission_paid: Decimal
@@ -228,7 +229,7 @@ def compute_account_breakdown(db: Session, user: User, *, as_of: date | None = N
 
         net_invested = sum((h.net_invested for h in scheme_holdings), Decimal("0"))
         current_value = sum((h.current_value for h in scheme_holdings), Decimal("0"))
-        net_gain_loss = sum((h.total_gain for h in scheme_holdings), Decimal("0"))
+        net_gain_loss = sum((h.unrealized_gain for h in scheme_holdings), Decimal("0"))
         pct_gain = (net_gain_loss / net_invested * 100) if net_invested != 0 else None
 
         flows = [(t.transaction_date, t.signed_amount) for t in acc_txns]
@@ -256,14 +257,11 @@ def compute_dashboard(db: Session, user: User, *, as_of: date | None = None) -> 
 
     net_invested = sum((h.net_invested for h in holdings), Decimal("0"))
     current_value = sum((h.current_value for h in holdings), Decimal("0"))
-    # Sum of each scheme's own total_gain (unrealized + realized), not
-    # current_value - net_invested - the latter would silently drop every
-    # scheme's realized gain from past redemptions, since net_invested is
-    # now cost-of-units-held only and doesn't net against redemption
-    # proceeds the way it used to (see compute_holdings for why that
-    # netting was wrong). This keeps the KPI card consistent with what the
-    # per-scheme breakdown table shows.
-    net_gain_loss = sum((h.total_gain for h in holdings), Decimal("0"))
+    # Unrealized only (current_value - cost of units still held). Gains
+    # booked from past redemptions are reported separately as
+    # total_realized_gain so the two aren't blended in one number.
+    net_gain_loss = sum((h.unrealized_gain for h in holdings), Decimal("0"))
+    total_realized_gain = sum((h.realized_gain for h in holdings), Decimal("0"))
     total_return_pct = (net_gain_loss / net_invested * 100) if net_invested != 0 else None
     active_schemes = sum(1 for h in holdings if h.net_units > 0)
 
@@ -298,6 +296,7 @@ def compute_dashboard(db: Session, user: User, *, as_of: date | None = None) -> 
         net_invested=net_invested,
         current_value=current_value,
         net_gain_loss=net_gain_loss,
+        total_realized_gain=total_realized_gain,
         total_return_pct=total_return_pct,
         active_schemes=active_schemes,
         total_commission_paid=total_commission_paid,

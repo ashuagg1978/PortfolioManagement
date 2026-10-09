@@ -101,6 +101,7 @@ export interface DashboardSummary {
   net_invested: number;
   current_value: number;
   net_gain_loss: number;
+  total_realized_gain: number;
   total_return_pct: number | null;
   active_schemes: number;
   total_commission_paid: number;

@@ -45,6 +45,7 @@ class DashboardSummaryOut(BaseModel):
     net_invested: MoneyField
     current_value: MoneyField
     net_gain_loss: MoneyField
+    total_realized_gain: MoneyField
     total_return_pct: float | None
     active_schemes: int
     total_commission_paid: MoneyField
