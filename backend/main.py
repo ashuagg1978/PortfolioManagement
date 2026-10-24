@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.routes.accounts import router as accounts_router
+from api.routes.advisor import router as advisor_router
 from api.routes.dashboard import router as dashboard_router
 from api.routes.health import router as health_router
 from api.routes.imports import router as imports_router
@@ -26,6 +27,7 @@ app.add_middleware(
 
 app.include_router(health_router)
 app.include_router(accounts_router, prefix=settings.api_prefix)
+app.include_router(advisor_router, prefix=settings.api_prefix)
 app.include_router(nav_router, prefix=settings.api_prefix)
 app.include_router(transactions_router, prefix=settings.api_prefix)
 app.include_router(dashboard_router, prefix=settings.api_prefix)

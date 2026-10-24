@@ -11,7 +11,9 @@ import type {
   ImportBatch,
   ImportRow,
   NavHistoryPoint,
+  PortfolioAdvice,
   PortfolioHistoryPoint,
+  SchemeAdvice,
   SchemeHolding,
   SchemeSearchResult,
   Sip,
@@ -144,6 +146,12 @@ export const previewCommission = (input: {
 // --- dashboard ---
 export const getDashboard = () => get<DashboardSummary>('/dashboard');
 export const getHoldings = () => get<SchemeHolding[]>('/dashboard/holdings');
+export const getSavedPortfolioAdvice = () => get<PortfolioAdvice | null>('/advisor/portfolio');
+export const getSavedSchemeAdvice = (schemeCode: string) =>
+  get<SchemeAdvice | null>(`/advisor/schemes/${encodeURIComponent(schemeCode)}`);
+export const getPortfolioAdvice = () => post<PortfolioAdvice>('/advisor/portfolio');
+export const getSchemeAdvice = (schemeCode: string) =>
+  post<SchemeAdvice>(`/advisor/schemes/${encodeURIComponent(schemeCode)}`);
 export const getPortfolioHistory = () => get<PortfolioHistoryPoint[]>('/dashboard/history');
 
 // --- SIPs ---

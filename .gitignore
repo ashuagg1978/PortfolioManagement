@@ -8,6 +8,7 @@ backend/.venv/
 **/__pycache__/
 backend/.pytest_cache/
 backend/.mypy_cache/
+backend/config.json
 
 # Database (SQLite file + WAL sidecars - the app's entire persisted state)
 # *.db

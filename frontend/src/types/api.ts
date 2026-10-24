@@ -86,6 +86,42 @@ export interface SchemeHolding {
   xirr: number | null;
 }
 
+export interface AdviceSource {
+  title: string;
+  url: string;
+}
+
+export interface SchemeAdvice {
+  scheme_code: string;
+  display_name: string;
+  action: 'BUY' | 'SELL' | 'HOLD';
+  confidence: 'LOW' | 'MEDIUM' | 'HIGH';
+  rationale: string;
+  risks: string[];
+  sources: AdviceSource[];
+  model: string;
+  disclaimer: string;
+  generated_at: string | null;
+}
+
+export interface PortfolioAdviceAction {
+  scheme_code: string | null;
+  scheme_name: string;
+  action: 'INCREASE' | 'REDUCE' | 'EXIT' | 'REPLACE' | 'HOLD';
+  suggestion: string;
+  rationale: string;
+}
+
+export interface PortfolioAdvice {
+  summary: string;
+  actions: PortfolioAdviceAction[];
+  diversification_notes: string[];
+  sources: AdviceSource[];
+  model: string;
+  disclaimer: string;
+  generated_at: string | null;
+}
+
 export interface AccountHoldings {
   account_id: number;
   account_name: string;

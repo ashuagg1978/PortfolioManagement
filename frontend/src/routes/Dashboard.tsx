@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getDashboard, getPortfolioHistory, syncNav } from '../lib/api';
 import { formatCurrency, formatDate, formatPercent, formatXirr } from '../lib/format';
@@ -6,9 +7,12 @@ import HoldingsTable from '../components/HoldingsTable';
 import AllocationBar, { allocationColor } from '../components/AllocationBar';
 import AccountBreakdown from '../components/AccountBreakdown';
 import PortfolioValueChart from '../components/PortfolioValueChart';
+import { PortfolioAdvicePanel, SchemeAdvicePanel } from '../components/AdvicePanels';
+import type { SchemeHolding } from '../types/api';
 
 export default function Dashboard() {
   const queryClient = useQueryClient();
+  const [adviseFor, setAdviseFor] = useState<SchemeHolding | null>(null);
   const { data, isLoading, error } = useQuery({ queryKey: ['dashboard'], queryFn: getDashboard });
   const history = useQuery({ queryKey: ['portfolio-history'], queryFn: getPortfolioHistory });
 
@@ -145,8 +149,18 @@ export default function Dashboard() {
               <h3>MF-wise breakdown</h3>
             </div>
           </div>
-          <HoldingsTable holdings={data.holdings} />
+          <HoldingsTable holdings={data.holdings} onAdvise={setAdviseFor} />
         </article>
+      </section>
+
+      {adviseFor && (
+        <section className="content-grid content-grid--single">
+          <SchemeAdvicePanel holding={adviseFor} onClose={() => setAdviseFor(null)} />
+        </section>
+      )}
+
+      <section className="content-grid content-grid--single">
+        <PortfolioAdvicePanel />
       </section>
 
       <section className="content-grid content-grid--single">

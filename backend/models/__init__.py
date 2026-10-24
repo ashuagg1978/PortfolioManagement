@@ -3,6 +3,7 @@ required for Alembic autogenerate and for metadata.create_all() in tests.
 """
 
 from models.account import Account
+from models.advice import Advice
 from models.import_batch import ImportBatch
 from models.import_row import ImportRow
 from models.market_holiday import MarketHoliday
@@ -17,6 +18,7 @@ from models.user import User
 
 __all__ = [
     "Account",
+    "Advice",
     "ImportBatch",
     "ImportRow",
     "MarketHoliday",

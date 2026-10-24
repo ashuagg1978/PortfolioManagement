@@ -59,7 +59,12 @@ const columns = [
   }),
 ];
 
-export default function HoldingsTable({ holdings }: { holdings: SchemeHolding[] }) {
+interface HoldingsTableProps {
+  holdings: SchemeHolding[];
+  onAdvise?: (holding: SchemeHolding) => void;
+}
+
+export default function HoldingsTable({ holdings, onAdvise }: HoldingsTableProps) {
   const navigate = useNavigate();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'current_value', desc: true }]);
   const data = useMemo(() => holdings, [holdings]);
@@ -89,6 +94,7 @@ export default function HoldingsTable({ holdings }: { holdings: SchemeHolding[] 
                   {{ asc: ' ▲', desc: ' ▼' }[header.column.getIsSorted() as string] ?? ''}
                 </th>
               ))}
+              {onAdvise && <th>AI</th>}
             </tr>
           ))}
         </thead>
@@ -103,6 +109,22 @@ export default function HoldingsTable({ holdings }: { holdings: SchemeHolding[] 
               {row.getVisibleCells().map((cell) => (
                 <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
               ))}
+              {onAdvise && (
+                <td>
+                  <button
+                    type="button"
+                    className="btn btn--small"
+                    disabled={row.original.net_units <= 0}
+                    title={row.original.net_units <= 0 ? 'Fully redeemed' : 'Ask Gemini: buy, sell or hold?'}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onAdvise(row.original);
+                    }}
+                  >
+                    Advise
+                  </button>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>

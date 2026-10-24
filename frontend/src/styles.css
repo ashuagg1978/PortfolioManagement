@@ -899,6 +899,59 @@ h4 {
   white-space: normal;
 }
 
+.advice h4 {
+  margin: 14px 0 6px;
+}
+
+.advice p + p,
+.advice p + .table-scroll {
+  margin-top: 10px;
+}
+
+.advice__muted {
+  color: #5b6b7d;
+  font-size: 0.85rem;
+}
+
+.advice__sources {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.9rem;
+}
+
+.advice__badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+  font-size: 0.8rem;
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.advice__badge--buy,
+.advice__badge--increase {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.advice__badge--sell,
+.advice__badge--exit {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.advice__badge--reduce,
+.advice__badge--replace {
+  background: #fef3c7;
+  color: #b45309;
+}
+
+.advice__actions {
+  display: flex;
+  gap: 8px;
+}
+
 .sync-result {
   color: #15803d;
   font-size: 0.88rem;
