@@ -48,3 +48,7 @@ npm.cmd run dev
 Open **http://localhost:5173**. The API is at **http://localhost:8000**, with interactive docs at **http://localhost:8000/docs**. Keep both terminals running while using the app.
 
 The SQLite database is stored at `backend/portfolio.db`. The seed command is safe to rerun; keep a backup of that database before making manual changes to it.
+
+AWS PostgreSQL DB Credentials:
+username: postgres
+password: Password#1031

@@ -27,3 +27,9 @@ backend/config.json
 .DS_Store
 Thumbs.db
 .vscode/
+
+# SSH keys
+*.pem
+
+# Deploy artifacts
+*.zip

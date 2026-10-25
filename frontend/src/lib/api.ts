@@ -25,6 +25,10 @@ import type {
   UpcomingOccurrence,
 } from '../types/api';
 
+/** Backend origin for production builds (e.g. http://host:8000); empty in dev,
+ * where Vite's proxy forwards the relative /api paths. */
+export const API_BASE: string = import.meta.env.VITE_API_BASE ?? '';
+
 export class ApiError extends Error {
   status: number;
   constructor(status: number, message: string) {
@@ -34,7 +38,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`/api${path}`, {
+  const res = await fetch(`${API_BASE}/api${path}`, {
     ...init,
     headers: { 'Content-Type': 'application/json', ...init?.headers },
   });
@@ -116,7 +120,7 @@ export const listTransactions = (filters: TransactionFilters = {}) => {
  * the full filtered set, not just the current page. */
 export const transactionsExportUrl = (filters: Omit<TransactionFilters, 'limit' | 'offset'> = {}) => {
   const qs = buildQuery(filters);
-  return `/api/transactions/export${qs ? `?${qs}` : ''}`;
+  return `${API_BASE}/api/transactions/export${qs ? `?${qs}` : ''}`;
 };
 export interface TransactionInput {
   account_id: number;
@@ -191,7 +195,7 @@ export const uploadImport = async (file: File, accountId: number): Promise<Impor
   const form = new FormData();
   form.append('file', file);
   form.append('account_id', String(accountId));
-  const res = await fetch('/api/imports', { method: 'POST', body: form });
+  const res = await fetch(`${API_BASE}/api/imports`, { method: 'POST', body: form });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ detail: res.statusText }));
     throw new ApiError(res.status, body.detail ?? res.statusText);
