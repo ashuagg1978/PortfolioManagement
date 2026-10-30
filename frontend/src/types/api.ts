@@ -236,3 +236,17 @@ export interface CommissionPreview {
 export interface ApiErrorBody {
   detail: string;
 }
+
+export interface AuthUser {
+  id: number;
+  name: string;
+  email: string;
+  is_admin: boolean;
+  is_active: boolean;
+}
+
+export interface LoginResult {
+  access_token: string;
+  token_type: string;
+  user: AuthUser;
+}

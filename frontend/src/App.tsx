@@ -9,6 +9,10 @@ import SipEntriesDue from './routes/SipEntriesDue';
 import Import from './routes/Import';
 import Schemes from './routes/Schemes';
 import Accounts from './routes/Accounts';
+import Login from './routes/Login';
+import Users from './routes/Users';
+import ChangePassword from './routes/ChangePassword';
+import { useAuth } from './lib/auth';
 
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 const REF_DATA_OPEN_KEY = 'sidebar-ref-data-open';
@@ -52,7 +56,8 @@ function NavItem({ to, end, abbr, label, collapsed, badge }: NavItemProps) {
   );
 }
 
-export default function App() {
+function Shell() {
+  const { user, signOut } = useAuth();
   const location = useLocation();
   const [collapsed, setCollapsed] = useState(() => readStoredFlag(SIDEBAR_COLLAPSED_KEY, false));
   const [refDataOpen, setRefDataOpen] = useState(() => readStoredFlag(REF_DATA_OPEN_KEY, true));
@@ -135,7 +140,26 @@ export default function App() {
               </NavLink>
             </div>
           )}
+
+          {user?.is_admin && <NavItem to="/admin/users" abbr="Usr" label="Users" collapsed={collapsed} />}
         </nav>
+
+        <div className="sidebar__user">
+          {!collapsed && (
+            <NavLink to="/account" className="sidebar__user-name" title="Change password">
+              {user?.name}
+            </NavLink>
+          )}
+          <button
+            type="button"
+            className="sidebar__link sidebar__signout"
+            onClick={signOut}
+            title="Sign out"
+          >
+            <span className="sidebar__icon">Out</span>
+            {!collapsed && <span className="sidebar__label">Sign out</span>}
+          </button>
+        </div>
       </aside>
 
       <main className="app-main">
@@ -147,8 +171,16 @@ export default function App() {
           <Route path="/import" element={<Import />} />
           <Route path="/schemes" element={<Schemes />} />
           <Route path="/accounts" element={<Accounts />} />
+          <Route path="/account" element={<ChangePassword />} />
+          {user?.is_admin && <Route path="/admin/users" element={<Users />} />}
         </Routes>
       </main>
     </div>
   );
+}
+
+export default function App() {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user ? <Shell /> : <Login />;
 }

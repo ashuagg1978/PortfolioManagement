@@ -23,6 +23,8 @@ import type {
   TransactionSource,
   TransactionType,
   UpcomingOccurrence,
+  AuthUser,
+  LoginResult,
 } from '../types/api';
 
 /** Backend origin for production builds (e.g. http://host:8000); empty in dev,
@@ -37,21 +39,54 @@ export class ApiError extends Error {
   }
 }
 
+// --- auth token ---
+// Bearer token in localStorage (the API is on a different origin than the
+// static frontend, so a cookie isn't an option). A 401 anywhere clears it and
+// fires AUTH_EXPIRED_EVENT so the app drops back to the login page.
+const TOKEN_KEY = 'auth-token';
+export const AUTH_EXPIRED_EVENT = 'auth:expired';
+
+export function getToken(): string | null {
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+export function setToken(token: string | null): void {
+  try {
+    if (token) window.localStorage.setItem(TOKEN_KEY, token);
+    else window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // storage disabled - the session just won't survive a reload
+  }
+}
+function authHeaders(): Record<string, string> {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function failFrom(res: Response, path: string): Promise<never> {
+  let detail = res.statusText;
+  try {
+    const body = await res.json();
+    detail = body.detail ?? detail;
+  } catch {
+    // response wasn't JSON - keep statusText
+  }
+  if (res.status === 401 && path !== '/auth/login') {
+    setToken(null);
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
+  throw new ApiError(res.status, detail);
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}/api${path}`, {
     ...init,
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders(), ...init?.headers },
   });
-  if (!res.ok) {
-    let detail = res.statusText;
-    try {
-      const body = await res.json();
-      detail = body.detail ?? detail;
-    } catch {
-      // response wasn't JSON - keep statusText
-    }
-    throw new ApiError(res.status, detail);
-  }
+  if (!res.ok) await failFrom(res, path);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -68,6 +103,41 @@ function patch<T>(path: string, body: unknown): Promise<T> {
 function del<T>(path: string): Promise<T> {
   return request<T>(path, { method: 'DELETE' });
 }
+
+/** Authenticated file download: fetch with the token, then hand the blob to
+ * the browser. A plain <a href> can't carry the Authorization header. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api${path}`, { headers: authHeaders() });
+  if (!res.ok) await failFrom(res, path);
+  const match = /filename="?([^";]+)"?/.exec(res.headers.get('Content-Disposition') ?? '');
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = match?.[1] ?? fallbackName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// --- auth / users ---
+export const login = (username: string, password: string) =>
+  post<LoginResult>('/auth/login', { username, password });
+export const getMe = () => get<AuthUser>('/auth/me');
+export const changePassword = (current_password: string, new_password: string) =>
+  post<void>('/auth/change-password', { current_password, new_password });
+export interface UserInput {
+  name: string;
+  email: string;
+  password: string;
+  is_admin: boolean;
+}
+export const listUsers = () => get<AuthUser[]>('/admin/users');
+export const createUser = (input: UserInput) => post<AuthUser>('/admin/users', input);
+export const updateUser = (
+  id: number,
+  input: Partial<{ name: string; is_active: boolean; is_admin: boolean; password: string }>,
+) => patch<AuthUser>(`/admin/users/${id}`, input);
 
 // --- accounts ---
 export interface AccountInput {
@@ -114,14 +184,14 @@ export const listTransactions = (filters: TransactionFilters = {}) => {
   const qs = buildQuery(filters);
   return get<TransactionListResponse>(`/transactions${qs ? `?${qs}` : ''}`);
 };
-/** A plain download URL (not a fetch call) - the caller renders this as an
- * <a href> so the browser handles the file save, same pattern as the
- * import template download. Excludes limit/offset - export always covers
- * the full filtered set, not just the current page. */
-export const transactionsExportUrl = (filters: Omit<TransactionFilters, 'limit' | 'offset'> = {}) => {
+/** Downloads the export. Excludes limit/offset - export always covers the
+ * full filtered set, not just the current page. */
+export const exportTransactions = (filters: Omit<TransactionFilters, 'limit' | 'offset'> = {}) => {
   const qs = buildQuery(filters);
-  return `${API_BASE}/api/transactions/export${qs ? `?${qs}` : ''}`;
+  return downloadFile(`/transactions/export${qs ? `?${qs}` : ''}`, 'transactions_export.xlsx');
 };
+export const downloadImportTemplate = () =>
+  downloadFile('/imports/template', 'transaction_import_template.xlsx');
 export interface TransactionInput {
   account_id: number;
   scheme_code: string;
@@ -195,11 +265,8 @@ export const uploadImport = async (file: File, accountId: number): Promise<Impor
   const form = new FormData();
   form.append('file', file);
   form.append('account_id', String(accountId));
-  const res = await fetch(`${API_BASE}/api/imports`, { method: 'POST', body: form });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new ApiError(res.status, body.detail ?? res.statusText);
-  }
+  const res = await fetch(`${API_BASE}/api/imports`, { method: 'POST', body: form, headers: authHeaders() });
+  if (!res.ok) await failFrom(res, '/imports');
   return res.json();
 };
 export const getImportBatch = (id: number) => get<ImportBatch>(`/imports/${id}`);

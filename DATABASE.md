@@ -67,7 +67,9 @@ through `account_id`/`sip_id`).
 | `id` | PK | |
 | `name` | string | |
 | `email` | string, **unique** | |
-| `password_hash` | string, nullable | Nullable because there's no auth yet - see [API.md](API.md#authentication). |
+| `password_hash` | string, nullable | scrypt hash (`core/security.py`). `email` is also the login username. |
+| `is_admin` | bool | Can manage users. |
+| `is_active` | bool | Disabled users cannot log in; their existing tokens stop working immediately. |
 
 **CRUD:** create-only, via `scripts/seed.py` (idempotent - safe to re-run). No API routes; there's
 exactly one user (`SEED_USER_EMAIL` in settings), resolved by `api/deps.py::get_current_user`.

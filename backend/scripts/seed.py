@@ -12,6 +12,7 @@ from datetime import date
 from pathlib import Path
 
 from core.config import settings
+from core.security import hash_password
 from db.session import SessionLocal, engine
 from db.base import Base
 import models  # noqa: F401 - registers models on Base.metadata
@@ -36,12 +37,27 @@ def seed() -> None:
     try:
         user = db.query(User).filter(User.email == settings.seed_user_email).first()
         if user is None:
-            user = User(name=settings.seed_user_name, email=settings.seed_user_email)
+            user = User(
+                name=settings.seed_user_name,
+                email=settings.seed_user_email,
+                password_hash=hash_password(settings.seed_user_password),
+            )
             db.add(user)
             db.flush()
             print(f"created user: {user.email}")
         else:
             print(f"user already exists: {user.email}")
+
+        if db.query(User).filter(User.email == settings.admin_username).first() is None:
+            db.add(
+                User(
+                    name=settings.admin_name,
+                    email=settings.admin_username,
+                    password_hash=hash_password(settings.admin_password),
+                    is_admin=True,
+                )
+            )
+            print(f"created admin: {settings.admin_username}")
 
         for account_name, platform in ACCOUNTS:
             exists = (

@@ -10,10 +10,24 @@ JSON numbers (not strings) - see [DATABASE.md](DATABASE.md#money-nav-and-units-a
 
 ## Authentication
 
-None yet. Every route resolves the single seeded user via `api/deps.py::get_current_user`
-(matched by `SEED_USER_EMAIL`), and every query is already scoped by that user's `user_id` -
-directly, or indirectly through `account_id`/`sip_id`/`batch_id` ownership checks. Adding real auth
-later means changing the body of that one dependency function; no route needs to change.
+Every `/api` route except `POST /api/auth/login` requires `Authorization: Bearer <token>`
+(`/health` is public). Tokens are HS256 JWTs valid for `ACCESS_TOKEN_HOURS` (default 7 days);
+`api/deps.py::get_current_user` resolves one to a user and re-checks `is_active` on every request.
+Every query is scoped by that user's `user_id` - directly, or via `account_id`/`sip_id`/`batch_id`
+ownership checks - so users never see each other's data.
+
+| Endpoint | Notes |
+|---|---|
+| `POST /api/auth/login` | `{username, password}` -> `{access_token, user}`. 5 failures per (IP, username) locks it for 5 min (429). |
+| `GET /api/auth/me` | Current user. |
+| `POST /api/auth/change-password` | `{current_password, new_password}` (min 8 chars). |
+| `GET/POST /api/admin/users`, `PATCH /api/admin/users/{id}` | Admin only: list, create, and update (name, `is_active`, `is_admin`, password reset). |
+
+The username is the user's `email` column. Bootstrap accounts come from the `b7e2f4a1c9d3`
+migration / `python -m scripts.seed`: the admin (`ADMIN_USERNAME`, default `admin`) and the owner of
+the pre-auth data (`SEED_USER_EMAIL`). Their initial passwords come from `ADMIN_PASSWORD` /
+`SEED_USER_PASSWORD` (default `password@123` - change them in the app after first login).
+`AUTH_SECRET` signs tokens; if unset a random key is generated into `backend/.auth_secret`.
 
 ## Errors
 

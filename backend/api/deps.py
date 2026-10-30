@@ -1,26 +1,39 @@
 """Shared FastAPI dependencies.
 
-get_current_user is the one seam where real authentication plugs in later:
-today it always returns the single seeded user; swapping in JWT/session
-auth means changing the body of this one function, not every route that
-calls it.
+get_current_user resolves the Bearer token to a User. main.py attaches it to
+every /api router, so no endpoint is reachable without a valid login; routes
+that need the user object still declare the dependency themselves (FastAPI
+caches it per request, so it runs once).
 """
 
-from collections.abc import Generator
-
 from fastapi import Depends, HTTPException
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from core.config import settings
+from core.security import decode_access_token
 from db.session import get_db
 from models.user import User
 
+_bearer = HTTPBearer(auto_error=False)
 
-def get_current_user(db: Session = Depends(get_db)) -> User:
-    user = db.query(User).filter(User.email == settings.seed_user_email).first()
-    if user is None:
-        raise HTTPException(
-            status_code=500,
-            detail="No seeded user found - run `python -m scripts.seed` first.",
-        )
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> User:
+    unauthorized = HTTPException(
+        status_code=401, detail="Not authenticated", headers={"WWW-Authenticate": "Bearer"}
+    )
+    if credentials is None:
+        raise unauthorized
+    user_id = decode_access_token(credentials.credentials)
+    user = db.get(User, user_id) if user_id is not None else None
+    if user is None or not user.is_active:
+        raise unauthorized
+    return user
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user

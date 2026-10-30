@@ -8,7 +8,7 @@ import {
   listTransactions,
   restoreTransaction,
   softDeleteTransaction,
-  transactionsExportUrl,
+  exportTransactions,
   updateTransaction,
   type TransactionInput,
 } from '../lib/api';
@@ -112,7 +112,7 @@ export default function Transactions() {
   // full filtered set, not just the page on screen. Uses schemeQueryDraft
   // (not the debounced schemeQuery) so exporting right after typing
   // reflects what's actually in the box.
-  const exportUrl = transactionsExportUrl({
+  const exportFilters = {
     account_id: accountId ? Number(accountId) : undefined,
     scheme_name: schemeQueryDraft || undefined,
     type: (type || undefined) as TransactionType | undefined,
@@ -120,7 +120,14 @@ export default function Transactions() {
     date_from: dateFrom || undefined,
     date_to: dateTo || undefined,
     include_deleted: includeDeleted,
-  });
+  };
+  const [exportError, setExportError] = useState<string | null>(null);
+  const runExport = () => {
+    setExportError(null);
+    exportTransactions(exportFilters).catch((err) =>
+      setExportError(err instanceof Error ? err.message : 'Export failed.'),
+    );
+  };
 
   const { data, isLoading } = useQuery({
     queryKey: ['transactions', listFilters],
@@ -372,10 +379,11 @@ Add it anyway as a duplicate?`)) {
             </h3>
           </div>
           {total > 0 && (
-            <a className="btn" href={exportUrl} download>
+            <button type="button" className="btn" onClick={runExport}>
               ⬇ Export to Excel
-            </a>
+            </button>
           )}
+          {exportError && <p className="form-error">{exportError}</p>}
         </div>
 
         <div className="filter-bar">

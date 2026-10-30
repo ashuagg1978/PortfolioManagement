@@ -62,9 +62,10 @@ The backend is a FastAPI application, normally started with Uvicorn from `backen
 - `backend/core/config.py` supplies environment-driven settings and local defaults. No background
   scheduler is used: NAV synchronization is initiated by an API request.
 
-Authentication is not implemented yet. Requests resolve the single seeded user through
-`api/deps.py::get_current_user`; user-owned data is scoped through that identity. This is a
-single-user local application boundary, not production-grade access control.
+Authentication is bearer-token (JWT) based; see [API.md](API.md#authentication). Every `/api`
+router is mounted with the `get_current_user` dependency except the login/admin router, and
+user-owned data is scoped through that identity. The frontend shows a login page until a valid
+token is held, and clears all cached query data on sign-out.
 
 ### Database and Migrations
 

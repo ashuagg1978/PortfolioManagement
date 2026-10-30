@@ -23,11 +23,22 @@ class Settings(BaseSettings):
 
     amfi_nav_url: str = "https://portal.amfiindia.com/spages/NAVAll.txt"
 
-    # No auth in v1 - every request is scoped to this single seeded user.
-    # app/api/deps.py::get_current_user() is the one seam where real auth
-    # plugs in later.
-    seed_user_email: str = "owner@portfolio.local"
-    seed_user_name: str = "Portfolio Owner"
+    # Bootstrap accounts, created by the auth migration / scripts.seed. The
+    # seed user owns the portfolio data that existed before multi-user auth;
+    # the admin can create further users. Override the passwords via env
+    # (SEED_USER_PASSWORD / ADMIN_PASSWORD) and change them in the app.
+    seed_user_email: str = "aggarwal_ashutosh@yahoo.com"
+    seed_user_name: str = "Ashutosh Aggarwal"
+    seed_user_password: str = "password@123"
+    admin_username: str = "admin"
+    admin_name: str = "Administrator"
+    admin_password: str = "password@123"
+
+    # Token signing key. Empty = generate once and persist to backend/.auth_secret.
+    auth_secret: str = ""
+    access_token_hours: int = 24 * 7
+    login_max_failures: int = 5
+    login_lockout_seconds: int = 300
 
     gemini_api_key: str = ""
     gemini_model: str = "gemini-2.5-pro"

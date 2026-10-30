@@ -21,7 +21,7 @@ $py = @"
 import os, sys, zipfile
 src, out, with_db = sys.argv[1], sys.argv[2], sys.argv[3] == "1"
 skip_dirs = {"__pycache__", ".pytest_cache", ".mypy_cache", ".venv", "tests"}
-skip_files = {"portfolio.db-wal", "portfolio.db-shm"}
+skip_files = {"portfolio.db-wal", "portfolio.db-shm", ".auth_secret"}
 if not with_db:
     skip_files.add("portfolio.db")
 if os.path.exists(out):

@@ -33,3 +33,6 @@ Thumbs.db
 
 # Deploy artifacts
 *.zip
+
+# Auto-generated token signing key
+backend/.auth_secret

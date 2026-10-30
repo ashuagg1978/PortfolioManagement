@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  API_BASE,
+  downloadImportTemplate,
   ApiError,
   commitImportBatch,
   getImportBatch,
@@ -78,9 +78,9 @@ export default function Import() {
             <p className="eyebrow">Step 1</p>
             <h3>Choose an account, then upload a statement</h3>
           </div>
-          <a className="btn" href={`${API_BASE}/api/imports/template`} download>
+          <button type="button" className="btn" onClick={() => void downloadImportTemplate()}>
             ⬇ Download bulk upload template
-          </a>
+          </button>
         </div>
         <p className="hint">
           Every row in the file is imported into the one account you pick here - use a separate
